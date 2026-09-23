@@ -83,3 +83,12 @@ test('an ampersand in a Markdown link stays encoded', () => {
   const qa = 'Q%26A%20open%20points';
   assert.equal(retarget(`[m](docs/Guide.md#${qa})`), `[m](docs/Guide.md#3.%20${qa})`);
 });
+
+test('keeps the backslash of an alias pipe escaped inside a table', () => {
+  // Without it the pipe ends the cell and the table falls apart.
+  const row = '| [[Guide#Setup\\|setting up]] | [[#Setup\\|here]] |';
+  assert.equal(
+    retarget(row, (path) => path === 'Guide' || path === ''),
+    '| [[Guide#2.1. Setup\\|setting up]] | [[#2.1. Setup\\|here]] |',
+  );
+});

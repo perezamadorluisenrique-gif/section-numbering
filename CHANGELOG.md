@@ -4,7 +4,11 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
-## Unreleased
+## 0.1.2
+
+- A link with an alias inside a table, written `[[Note#Heading\|alias]]` so
+  the pipe does not end the cell, lost its backslash when the heading was
+  renumbered, which split the table cell in two. The backslash now stays.
 
 ## 0.1.1
 
