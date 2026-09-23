@@ -50,12 +50,12 @@ export function scanLines(text: string): Line[] {
     if (raw.endsWith('\r')) raw = raw.slice(0, -1);
 
     let kind: LineKind;
-    if (index === 0 && raw.trimEnd() === '---') {
+    if (index === 0 && trimEnd(raw) === '---') {
       frontmatter = true;
       kind = 'frontmatter';
     } else if (frontmatter) {
       kind = 'frontmatter';
-      const trimmed = raw.trimEnd();
+      const trimmed = trimEnd(raw);
       if (trimmed === '---' || trimmed === '...') frontmatter = false;
     } else if (fence) {
       kind = 'code';
@@ -85,6 +85,14 @@ export function scanLines(text: string): Line[] {
     index++;
   }
   return lines;
+}
+
+/**
+ * `String.prototype.trimEnd` is ES2019 and the plugin targets ES2018, where
+ * the type checker has no signature for it.
+ */
+function trimEnd(s: string): string {
+  return s.replace(/\s+$/, '');
 }
 
 function countOf(haystack: string, needle: string): number {
