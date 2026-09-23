@@ -1,0 +1,10 @@
+{
+  "id": "section-numbering",
+  "name": "Section Numbering",
+  "version": "0.1.0",
+  "minAppVersion": "1.1.1",
+  "description": "Numbers your headings as an outline (1, 1.1, 1.2) and renumbers them when sections move. Links to a renumbered heading, in the note and across the vault, are rewritten so they keep working.",
+  "author": "Siulved54",
+  "authorUrl": "https://github.com/perezamadorluisenrique-gif",
+  "isDesktopOnly": false
+}
