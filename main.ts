@@ -1,9 +1,10 @@
 import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import type { SettingDefinitionItem } from 'obsidian';
 
 import { retargetLinks } from './src/links.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
-import { DEFAULT_NUMBERING, SEPARATORS, planNumbering, planRemoval } from './src/numbering.ts';
+import { DEFAULT_NUMBERING, planNumbering, planRemoval } from './src/numbering.ts';
 import type { NumberStyle, NumberingSettings, Plan, Separator } from './src/numbering.ts';
 
 interface SectionNumberingSettings extends NumberingSettings {
@@ -132,7 +133,7 @@ const STYLE_OPTIONS: Record<NumberStyle, string> = {
   I: 'I, II, III',
 };
 
-const SEPARATOR_LABELS: Record<Separator, string> = {
+const SEPARATOR_OPTIONS: Record<Separator, string> = {
   '.': '1.2. Heading',
   ')': '1.2) Heading',
   ':': '1.2: Heading',
@@ -141,85 +142,119 @@ const SEPARATOR_LABELS: Record<Separator, string> = {
   '': '1.2 Heading',
 };
 
+const LEVEL_OPTIONS: Record<string, string> = {};
+for (const level of LEVELS) LEVEL_OPTIONS[String(level)] = `Heading ${level}`;
+
+type SettingKey = keyof SectionNumberingSettings;
+
+interface SettingRow {
+  key: SettingKey;
+  name: string;
+  desc: string;
+  /** A dropdown's options, value to label; none means a toggle. */
+  options?: Record<string, string>;
+}
+
+/**
+ * Every setting, described once. Both renderings below are built from this
+ * table, so the declarative one and the pre-1.13 fallback cannot drift.
+ */
+const SETTINGS: SettingRow[] = [
+  {
+    key: 'firstLevel',
+    name: 'First numbered level',
+    desc:
+      'The heading level that gets a single number. Automatic uses the shallowest heading in each note. ' +
+      'Shallower headings stay unnumbered and restart the count.',
+    options: { auto: 'Automatic', ...LEVEL_OPTIONS },
+  },
+  {
+    key: 'maxLevel',
+    name: 'Last numbered level',
+    desc: 'Deeper headings are left as they are.',
+    options: LEVEL_OPTIONS,
+  },
+  { key: 'topStyle', name: 'Top-level numbers', desc: 'How the first number is written.', options: STYLE_OPTIONS },
+  {
+    key: 'otherStyle',
+    name: 'Lower-level numbers',
+    desc: 'How every number after the first is written.',
+    options: STYLE_OPTIONS,
+  },
+  {
+    key: 'separator',
+    name: 'Separator',
+    desc:
+      'What follows the number. With no separator, a heading that already starts with a number, ' +
+      'such as "2024 in review", is taken to be numbered and loses it.',
+    options: SEPARATOR_OPTIONS,
+  },
+  {
+    key: 'updateLinks',
+    name: 'Update links in other notes',
+    desc:
+      'When a heading is renumbered, rewrite links to it in the rest of the vault so they keep working. ' +
+      'Links within the note itself are always updated.',
+  },
+];
+
+/** Levels are stored as numbers, but a dropdown only deals in strings. */
+function toStored(key: SettingKey, value: unknown): unknown {
+  if ((key === 'firstLevel' || key === 'maxLevel') && value !== 'auto') return Number(value);
+  return value;
+}
+
 class SectionNumberingSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: SectionNumberingPlugin) {
     super(app, plugin);
   }
 
+  /**
+   * The settings, described rather than drawn, so Obsidian 1.13 and later
+   * renders them itself and finds them in the settings search. Older
+   * versions do not know this method and call `display()` instead.
+   */
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return SETTINGS.map((row) => ({
+      name: row.name,
+      desc: row.desc,
+      control: row.options
+        ? { type: 'dropdown' as const, key: row.key, options: row.options, defaultValue: String(DEFAULT_SETTINGS[row.key]) }
+        : { type: 'toggle' as const, key: row.key, defaultValue: DEFAULT_SETTINGS[row.key] as boolean },
+    }));
+  }
+
+  getControlValue(key: string): unknown {
+    const value = this.plugin.settings[key as SettingKey];
+    return typeof value === 'number' ? String(value) : value;
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    Object.assign(this.plugin.settings, { [key]: toStored(key as SettingKey, value) });
+    await this.plugin.saveSettings();
+  }
+
+  /** The pre-1.13 rendering; a current Obsidian never calls it. */
   display(): void {
     const { containerEl } = this;
-    const settings = this.plugin.settings;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName('First numbered level')
-      .setDesc(
-        'The heading level that gets a single number. Automatic uses the shallowest heading in each note. ' +
-          'Shallower headings stay unnumbered and restart the count.',
-      )
-      .addDropdown((dropdown) => {
-        dropdown.addOption('auto', 'Automatic');
-        for (const level of LEVELS) dropdown.addOption(String(level), `Heading ${level}`);
-        dropdown.setValue(String(settings.firstLevel)).onChange(async (value) => {
-          settings.firstLevel = value === 'auto' ? 'auto' : (Number(value) as NumberingSettings['maxLevel']);
-          await this.plugin.saveSettings();
+    for (const row of SETTINGS) {
+      const setting = new Setting(containerEl).setName(row.name).setDesc(row.desc);
+      const current = this.getControlValue(row.key);
+      if (row.options) {
+        const options = row.options;
+        setting.addDropdown((dropdown) => {
+          dropdown
+            .addOptions(options)
+            .setValue(String(current))
+            .onChange((value) => this.setControlValue(row.key, value));
         });
-      });
-
-    new Setting(containerEl)
-      .setName('Last numbered level')
-      .setDesc('Deeper headings are left as they are.')
-      .addDropdown((dropdown) => {
-        for (const level of LEVELS) dropdown.addOption(String(level), `Heading ${level}`);
-        dropdown.setValue(String(settings.maxLevel)).onChange(async (value) => {
-          settings.maxLevel = Number(value) as NumberingSettings['maxLevel'];
-          await this.plugin.saveSettings();
+      } else {
+        setting.addToggle((toggle) => {
+          toggle.setValue(current === true).onChange((value) => this.setControlValue(row.key, value));
         });
-      });
-
-    new Setting(containerEl)
-      .setName('Top-level numbers')
-      .addDropdown((dropdown) => {
-        dropdown.addOptions(STYLE_OPTIONS).setValue(settings.topStyle).onChange(async (value) => {
-          settings.topStyle = value as NumberStyle;
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Lower-level numbers')
-      .addDropdown((dropdown) => {
-        dropdown.addOptions(STYLE_OPTIONS).setValue(settings.otherStyle).onChange(async (value) => {
-          settings.otherStyle = value as NumberStyle;
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Separator')
-      .setDesc(
-        'What follows the number. With no separator, a heading that already starts with a number, ' +
-          'such as "2024 in review", is taken to be numbered and loses it.',
-      )
-      .addDropdown((dropdown) => {
-        for (const separator of SEPARATORS) dropdown.addOption(separator, SEPARATOR_LABELS[separator]);
-        dropdown.setValue(settings.separator).onChange(async (value) => {
-          settings.separator = value as Separator;
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl)
-      .setName('Update links in other notes')
-      .setDesc(
-        'When a heading is renumbered, rewrite links to it in the rest of the vault so they keep working. ' +
-          'Links within the note itself are always updated.',
-      )
-      .addToggle((toggle) => {
-        toggle.setValue(settings.updateLinks).onChange(async (value) => {
-          settings.updateLinks = value;
-          await this.plugin.saveSettings();
-        });
-      });
+      }
+    }
   }
 }

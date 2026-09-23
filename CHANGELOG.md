@@ -6,6 +6,15 @@ renames the `Unreleased` heading below to that version.
 
 ## Unreleased
 
+## 0.1.1
+
+- Settings now turn up in Obsidian's settings search on 1.13 and later: the
+  tab is described with the declarative settings API. The settings and what
+  they do are unchanged.
+- The source no longer relies on Node's type definitions for
+  `String.prototype.trimEnd`, which the plugin review flagged as an unsafe
+  call. The behaviour is identical.
+
 ## 0.1.0
 
 First release.
