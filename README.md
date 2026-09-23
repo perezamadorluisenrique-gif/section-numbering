@@ -12,6 +12,8 @@ them**.
 ### 2.1. Setup
 ```
 
+![Running Number headings in this note: the headings get numbers, and links to them in the same note and in another note are rewritten](https://raw.githubusercontent.com/perezamadorluisenrique-gif/section-numbering/main/docs/numbering.gif)
+
 ## Why links matter here
 
 A link to a heading names the heading by its text: `[[Guide#Setup]]`. The
@@ -31,6 +33,8 @@ Section Numbering rewrites those links as part of the renumbering:
 
 Links inside code, fenced or inline, are text about links and are left alone.
 Block references (`#^id`) are not headings and are never touched.
+
+![Before and after numbering: the Guide note on the left, and on the right a note whose links to Guide headings were rewritten to the numbered names](https://raw.githubusercontent.com/perezamadorluisenrique-gif/section-numbering/main/docs/before-after.png)
 
 ## Commands
 
