@@ -1,5 +1,9 @@
 # Section Numbering
 
+[![Latest release](https://img.shields.io/github/v/release/perezamadorluisenrique-gif/section-numbering?sort=semver)](https://github.com/perezamadorluisenrique-gif/section-numbering/releases/latest)
+[![CI](https://github.com/perezamadorluisenrique-gif/section-numbering/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/perezamadorluisenrique-gif/section-numbering/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/perezamadorluisenrique-gif/section-numbering)](LICENSE)
+
 Outline numbers for your headings — `1.`, `1.1.`, `1.2.` — that stay right
 when you move sections around, **without breaking the links that point at
 them**.

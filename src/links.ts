@@ -81,7 +81,11 @@ function encodeHeading(s: string): string {
 }
 
 function rewriteWikilink(match: RegExpExecArray, byKey: Map<string, string>, isTarget: IsTarget): string | null {
-  const target = match[1];
+  let target = match[1];
+  // Inside a table the alias pipe is written `\|`, or it would end the cell.
+  // The backslash belongs to the pipe, not to the heading, and has to stay.
+  const escape = match[2] !== undefined && target.endsWith('\\') ? '\\' : '';
+  if (escape) target = target.slice(0, -1);
   const hash = target.indexOf('#');
   if (hash === -1) return null;
   const path = target.slice(0, hash).trim();
@@ -89,7 +93,7 @@ function rewriteWikilink(match: RegExpExecArray, byKey: Map<string, string>, isT
   const subpath = retargetSubpath(target.slice(hash + 1), byKey);
   if (subpath === null) return null;
   const embed = match[0].startsWith('!') ? '!' : '';
-  return `${embed}[[${target.slice(0, hash)}#${subpath}${match[2] ?? ''}]]`;
+  return `${embed}[[${target.slice(0, hash)}#${subpath}${escape}${match[2] ?? ''}]]`;
 }
 
 function rewriteMarkdownLink(match: RegExpExecArray, byKey: Map<string, string>, isTarget: IsTarget): string | null {
