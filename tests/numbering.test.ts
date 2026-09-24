@@ -160,3 +160,20 @@ test('takes over notes numbered by the original plugin', () => {
   assert.equal(numbered(original, { separator: '' }), original);
   assert.equal(removed(original, { separator: '' }), '# Introduction\n## Scope\n# Method\n');
 });
+
+test('a heading that starts with a version keeps it', () => {
+  const note = '# Release notes\n## 2.0 migration\n## 3.14 is pi\n';
+  assert.equal(numbered(note), '# 1. Release notes\n## 1.1. 2.0 migration\n## 1.2. 3.14 is pi\n');
+  // Numbering again renumbers the plugin's own numbers and still keeps the version.
+  assert.equal(numbered(numbered(note)), numbered(note));
+  assert.equal(removed(numbered(note)), note);
+});
+
+test('removing numbers leaves a version alone', () => {
+  assert.equal(removed('# Intro\n## 2.0 migration\n'), '# Intro\n## 2.0 migration\n');
+});
+
+test('a note numbered throughout without separators is still taken over', () => {
+  const original = '## 1.1 Scope\n## 1.2 Terms\n';
+  assert.equal(numbered(original), '## 1. Scope\n## 2. Terms\n');
+});

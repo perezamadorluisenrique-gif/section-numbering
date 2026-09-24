@@ -154,6 +154,36 @@ function firstLevelOf(headings: Heading[], settings: NumberingSettings): number 
   return levels.length ? Math.min(...levels) : 1;
 }
 
+/**
+ * How many characters of each heading's text are an existing number, as
+ * `existingPrefixLength` reads it, with one correction for a note that is
+ * not numbered throughout.
+ *
+ * A dotted number with no separator after it, such as `2.0` in `## 2.0
+ * migration`, is also how a version or a decimal starts a heading. It is
+ * only taken for a number, and replaced, when every heading in range starts
+ * with a number: a note numbered by the original Number Headings plugin is,
+ * and a note that merely mentions a version is not. With the separator set
+ * to none the plugin writes such numbers itself, so they always count.
+ */
+function existingPrefixes(headings: Heading[], settings: NumberingSettings, first: number): number[] {
+  const pattern = numberPrefixPattern(settings);
+  const inRange = (h: Heading) => h.level >= first && h.level <= settings.maxLevel;
+  const lengths = headings.map((h) => (inRange(h) ? existingPrefixLength(h.text, pattern) : 0));
+  if (settings.separator === '') return lengths;
+
+  const numberedThroughout = headings.every(
+    (h, i) => !inRange(h) || lengths[i] > 0 || h.text.trim() === '',
+  );
+  if (numberedThroughout) return lengths;
+  return lengths.map((length, i) => (isUnmarked(headings[i].text.slice(0, length)) ? 0 : length));
+}
+
+/** A number with no separator after it: its last character is a digit or letter. */
+function isUnmarked(prefix: string): boolean {
+  return /[0-9A-Z]$/.test(prefix.replace(/[ \t]+$/, ''));
+}
+
 function recordRename(plan: Plan, heading: Heading, next: string): void {
   if (next === heading.text) return;
   plan.changed++;
@@ -171,18 +201,18 @@ export function planNumbering(text: string, settings: NumberingSettings): Plan {
   const plan: Plan = { edits: [], renames: new Map(), changed: 0 };
   const headings = parseHeadings(text);
   const first = firstLevelOf(headings, settings);
-  const pattern = numberPrefixPattern(settings);
+  const prefixes = existingPrefixes(headings, settings, first);
   let counters: number[] = [];
 
-  for (const heading of headings) {
+  headings.forEach((heading, index) => {
     if (heading.level < first) {
       counters = [];
-      continue;
+      return;
     }
-    if (heading.level > settings.maxLevel) continue;
+    if (heading.level > settings.maxLevel) return;
 
-    const existing = existingPrefixLength(heading.text, pattern);
-    if (heading.text.slice(existing).trim() === '') continue;
+    const existing = prefixes[index];
+    if (heading.text.slice(existing).trim() === '') return;
 
     const depth = heading.level - first;
     counters = counters.slice(0, depth + 1);
@@ -197,7 +227,7 @@ export function planNumbering(text: string, settings: NumberingSettings): Plan {
       plan.edits.push({ from: heading.from, to: heading.from + existing, insert: prefix });
     }
     recordRename(plan, heading, prefix + heading.text.slice(existing));
-  }
+  });
   return plan;
 }
 
@@ -206,14 +236,14 @@ export function planRemoval(text: string, settings: NumberingSettings): Plan {
   const plan: Plan = { edits: [], renames: new Map(), changed: 0 };
   const headings = parseHeadings(text);
   const first = firstLevelOf(headings, settings);
-  const pattern = numberPrefixPattern(settings);
+  const prefixes = existingPrefixes(headings, settings, first);
 
-  for (const heading of headings) {
-    if (heading.level < first || heading.level > settings.maxLevel) continue;
-    const existing = existingPrefixLength(heading.text, pattern);
-    if (existing === 0 || heading.text.slice(existing).trim() === '') continue;
+  headings.forEach((heading, index) => {
+    if (heading.level < first || heading.level > settings.maxLevel) return;
+    const existing = prefixes[index];
+    if (existing === 0 || heading.text.slice(existing).trim() === '') return;
     plan.edits.push({ from: heading.from, to: heading.from + existing, insert: '' });
     recordRename(plan, heading, heading.text.slice(existing));
-  }
+  });
   return plan;
 }
