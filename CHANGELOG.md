@@ -4,6 +4,15 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.1.3
+
+- A heading that starts with a version or a decimal, such as `## 2.0
+  migration`, no longer loses it when the note is numbered: it becomes
+  `## 1.1. 2.0 migration`. A dotted number with no separator after it is now
+  only replaced when every heading in the note is numbered, which is how a
+  note numbered by the original Number Headings plugin looks. Removing
+  numbers leaves such a version alone too.
+
 ## 0.1.2
 
 - A link with an alias inside a table, written `[[Note#Heading\|alias]]` so

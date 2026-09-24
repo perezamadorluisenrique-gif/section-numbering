@@ -71,8 +71,10 @@ To renumber, the plugin has to recognise a number it wrote earlier. With a
 separator that is unambiguous: `## 2024 in review` has no dot after the year,
 so it becomes `## 1. 2024 in review` and keeps its year. With no separator,
 a heading that starts with a number cannot be told apart from a numbered one,
-and the year would be replaced. Dotted numbers such as `1.2 Scope` are
-recognised whatever the separator.
+and the year would be replaced. Dotted numbers with no separator, such as
+`1.2 Scope`, are recognised whatever the separator, but only in a note where
+every heading is numbered: in a note that is not, `## 2.0 migration` is a
+version, not a number, and keeps it.
 
 ## Details
 
