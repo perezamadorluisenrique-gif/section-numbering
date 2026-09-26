@@ -74,7 +74,10 @@ a heading that starts with a number cannot be told apart from a numbered one,
 and the year would be replaced. Dotted numbers with no separator, such as
 `1.2 Scope`, are recognised whatever the separator, but only in a note where
 every heading is numbered: in a note that is not, `## 2.0 migration` is a
-version, not a number, and keeps it.
+version, not a number, and keeps it. A changelog whose every heading is a
+version, newest first, as in `## 2.0.1`, `## 2.0.0`, `## 1.9.0`, keeps its
+versions too: numbers that go down, with three parts on a top-level heading,
+are not an outline.
 
 ## Details
 

@@ -177,3 +177,15 @@ test('a note numbered throughout without separators is still taken over', () => 
   const original = '## 1.1 Scope\n## 1.2 Terms\n';
   assert.equal(numbered(original), '## 1. Scope\n## 2. Terms\n');
 });
+
+test('a changelog whose headings are all versions keeps them', () => {
+  const changelog = '## 2.0.1 Fixes\n## 2.0.0 Launch\n## 1.9.0\n';
+  assert.equal(numbered(changelog), '## 1. 2.0.1 Fixes\n## 2. 2.0.0 Launch\n## 3. 1.9.0\n');
+  assert.equal(removed(numbered(changelog)), changelog);
+  assert.equal(removed(changelog), changelog);
+});
+
+test('a numbered note whose sections were moved is still renumbered', () => {
+  assert.equal(numbered('## 1.2 Terms\n## 1.1 Scope\n'), '## 1. Terms\n## 2. Scope\n');
+  assert.equal(numbered('# 2 B\n## 2.1 C\n# 1 A\n## 1.1 D\n', { separator: '' }), '# 1 B\n## 1.1 C\n# 2 A\n## 2.1 D\n');
+});
