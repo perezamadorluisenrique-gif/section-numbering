@@ -1,6 +1,6 @@
 {
   "name": "section-numbering",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Section Numbering for Obsidian - outline numbers for headings, with the links that point at them kept working.",
   "main": "main.js",
   "scripts": {

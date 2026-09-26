@@ -175,8 +175,38 @@ function existingPrefixes(headings: Heading[], settings: NumberingSettings, firs
   const numberedThroughout = headings.every(
     (h, i) => !inRange(h) || lengths[i] > 0 || h.text.trim() === '',
   );
-  if (numberedThroughout) return lengths;
+  if (numberedThroughout && !looksLikeVersions(headings, lengths, first)) return lengths;
   return lengths.map((length, i) => (isUnmarked(headings[i].text.slice(0, length)) ? 0 : length));
+}
+
+/**
+ * Whether the unmarked dotted numbers in a note read as version numbers
+ * rather than an outline, as in a changelog: `## 2.0.1`, `## 2.0.0`,
+ * `## 1.9.0`. An outline's numbers go up in the order they appear and have
+ * as many parts as the heading is deep. Versions listed newest first go
+ * down, and have three parts or more, whatever the heading's depth. All of
+ * it must hold, so a numbered note whose sections were moved, or whose
+ * headings changed level, is still renumbered. Two-part versions such as
+ * `2.1` cannot be told from an outline this way and are still replaced.
+ */
+function looksLikeVersions(headings: Heading[], lengths: number[], first: number): boolean {
+  const unmarked: Array<{ parts: number[]; depth: number }> = [];
+  headings.forEach((h, i) => {
+    const prefix = h.text.slice(0, lengths[i]).replace(/[ \t]+$/, '');
+    if (lengths[i] === 0 || !isUnmarked(prefix) || !/^\d+(?:\.\d+)+$/.test(prefix)) return;
+    unmarked.push({ parts: prefix.split('.').map(Number), depth: h.level - first + 1 });
+  });
+  if (unmarked.length === 0) return false;
+  if (unmarked.some((n) => n.parts.length < 3 || n.parts.length === n.depth)) return false;
+  return unmarked.some((n, i) => i > 0 && compareParts(n.parts, unmarked[i - 1].parts) <= 0);
+}
+
+function compareParts(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? -1) - (b[i] ?? -1);
+    if (d !== 0) return d;
+  }
+  return 0;
 }
 
 /** A number with no separator after it: its last character is a digit or letter. */
