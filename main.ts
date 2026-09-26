@@ -25,6 +25,7 @@ export default class SectionNumberingPlugin extends Plugin {
     this.addCommand({
       id: 'number-headings',
       name: 'Number headings in this note',
+      icon: 'list-ordered',
       editorCallback: (editor, ctx) => {
         void this.apply(editor, ctx.file, planNumbering(editor.getValue(), this.settings), 'Numbered');
       },
@@ -32,6 +33,7 @@ export default class SectionNumberingPlugin extends Plugin {
     this.addCommand({
       id: 'remove-heading-numbers',
       name: 'Remove heading numbers in this note',
+      icon: 'list-x',
       editorCallback: (editor, ctx) => {
         void this.apply(editor, ctx.file, planRemoval(editor.getValue(), this.settings), 'Removed numbers from');
       },
