@@ -4,7 +4,7 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
-## Unreleased
+## 0.3.0
 
 - **Table of contents.** The new command *Insert or update table of contents*
   writes a list of links to the headings after a `^toc` line. Numbering,
