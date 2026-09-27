@@ -16,8 +16,9 @@
  *   `1.1)`, `1.1:`, `1.1 —`, `1.1 -`). A leading `_.` (`_.1.1`) leaves the
  *   top level unnumbered, which here means numbering starts one level lower.
  *
- * `auto`, `contents …` and `skip …` are accepted and ignored: this plugin
- * numbers on command, and does not write a table of contents.
+ * `auto` and `skip …` are accepted and ignored: this plugin numbers on
+ * command. `contents ^id` is read by `contentsAnchor`: the table of contents
+ * goes after the line that ends with that block id.
  *
  * A note with the key and no separator in its style gets none, which is what
  * Number Headings writes by default (`1 Introduction`).
@@ -37,11 +38,10 @@ const SEPARATOR: Record<string, Separator> = { '.': '.', ')': ')', ':': ':', '�
 type Level = 1 | 2 | 3 | 4 | 5 | 6;
 const asLevel = (n: number): Level | null => (n >= 1 && n <= 6 ? (n as Level) : null);
 
-/** The note's own settings, or null when its front matter has no `number headings` key. */
-export function noteSettings(text: string): NoteSettings | null {
-  const lines = scanLines(text);
+/** The note's `number headings` entry, unquoted, or null when it has none. */
+export function frontMatterValue(text: string): string | null {
   let value: string | null = null;
-  for (const line of lines) {
+  for (const line of scanLines(text)) {
     if (line.kind !== 'frontmatter') {
       if (value !== null || line.text.trim() !== '') break;
       continue;
@@ -49,9 +49,23 @@ export function noteSettings(text: string): NoteSettings | null {
     const match = KEY_LINE.exec(line.text);
     if (match) value = match[1];
   }
-  if (value === null) return null;
+  return value === null ? null : value.trim().replace(/^(["'])(.*)\1$/, '$2');
+}
 
-  value = value.trim().replace(/^(["'])(.*)\1$/, '$2');
+/**
+ * The block id the note's table of contents goes after, from a `contents
+ * ^toc` part of its `number headings` entry, or null when it names none.
+ */
+export function contentsAnchor(text: string): string | null {
+  const value = frontMatterValue(text);
+  const match = value === null ? null : /(?:^|,)\s*contents\s+\^?([\w-]+)/i.exec(value);
+  return match ? match[1] : null;
+}
+
+/** The note's own settings, or null when its front matter has no `number headings` key. */
+export function noteSettings(text: string): NoteSettings | null {
+  const value = frontMatterValue(text);
+  if (value === null) return null;
   const settings: Partial<NumberingSettings> = { separator: '' };
   let skipTop = false;
 

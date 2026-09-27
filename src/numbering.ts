@@ -150,7 +150,7 @@ export interface Plan {
   changed: number;
 }
 
-function firstLevelOf(headings: Heading[], settings: NumberingSettings): number {
+export function firstLevelOf(headings: Heading[], settings: NumberingSettings): number {
   if (settings.firstLevel !== 'auto') return settings.firstLevel;
   const levels = headings.filter((h) => h.level <= settings.maxLevel).map((h) => h.level);
   return levels.length ? Math.min(...levels) : 1;
