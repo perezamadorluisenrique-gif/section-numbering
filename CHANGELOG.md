@@ -4,6 +4,16 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## Unreleased
+
+- Notes numbered by the Number Headings plugin keep their own settings. A
+  `number headings` property in a note's front matter (`first-level`, `max`,
+  `start-at`, and a style such as `1.1`, `A.1` or `I.1` with an optional
+  separator) now overrides the plugin's settings for that note, and
+  `number headings: off` leaves the note alone. A new setting, **Follow
+  Number Headings properties**, turns this off.
+- New per-note option `start-at N` sets the first top-level number.
+
 ## 0.1.5
 
 - A changelog-style note, where every heading starts with a version listed

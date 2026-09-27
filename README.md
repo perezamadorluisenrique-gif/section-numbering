@@ -63,6 +63,7 @@ numbers, to change them back.
 | Top-level numbers | 1, 2, 3 | Or A, B, C, or I, II, III. |
 | Lower-level numbers | 1, 2, 3 | The same choice for every level below. |
 | Separator | `1.2. Heading` | Also `)`, `:`, ` —`, ` -` or none. |
+| Follow Number Headings properties | On | A note's `number headings` property overrides the settings above for that note. See [Coming from Number Headings](#coming-from-number-headings). |
 | Update links in other notes | On | Links within the note are always updated. |
 
 ### Why the default separator is a dot
@@ -99,6 +100,21 @@ exactly as they look now. To move to another separator, run *Remove heading
 numbers in this note* while it is still none, then change it and number again.
 While the separator is none, a heading that starts with a number, such as a
 year, is read as numbered.
+
+Notes that carry Number Headings' own settings in their properties keep
+them. With **Follow Number Headings properties** on (the default), a note
+whose front matter says, for example,
+
+```yaml
+number headings: auto, first-level 2, max 3, start-at 3, A.1
+```
+
+is numbered from heading 2 down to heading 3, starting at C, with numbers
+after the first written 1, 2, 3. The style may end in a separator (`1.1.`,
+`1.1)`, `1.1:`, `1.1 —`, `1.1 -`); without one there is none, as Number
+Headings writes it. `_.1.1` starts numbering one level lower.
+`number headings: off` leaves the note alone. `auto`, `contents` and `skip`
+are accepted and ignored.
 
 Automatic numbering as you type is not included: rewriting links in other notes
 on every keystroke is not something a plugin should do behind your back.
