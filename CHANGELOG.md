@@ -4,6 +4,14 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.3.0
+
+- **Table of contents.** The new command *Insert or update table of contents*
+  writes a list of links to the headings after a `^toc` line. Numbering,
+  renumbering or removing numbers updates it in the same edit, so its links
+  keep working. A note with Number Headings' `contents ^id` property keeps its
+  table of contents where it was.
+
 ## 0.2.0
 
 - Notes numbered by the Number Headings plugin keep their own settings. A

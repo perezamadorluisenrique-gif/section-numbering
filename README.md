@@ -46,13 +46,32 @@ Block references (`#^id`) are not headings and are never touched.
 |---|---|
 | Number headings in this note | Numbers every heading in range, or renumbers it if it is already numbered. |
 | Remove heading numbers in this note | Takes the numbers off again. |
+| Insert or update table of contents | Inserts a list of links to the headings at the cursor, or brings the existing one up to date. |
 
-Neither has a hotkey by default; assign one in **Settings → Hotkeys**.
+None has a hotkey by default; assign one in **Settings → Hotkeys**.
 
 In the note you are editing, the headings and the links change in one edit, so
 a single **undo** puts everything back. Links in other notes are changed on
 disk, and undo in this note does not reach them — number again, or remove the
 numbers, to change them back.
+
+## Table of contents
+
+*Insert or update table of contents* writes a **Contents** line carrying the
+block id `^toc`, followed by a list of links to every heading in the numbered
+range, indented by level:
+
+```markdown
+**Contents** ^toc
+- [[#1. Introduction|1. Introduction]]
+	- [[#1.1. Scope|1.1. Scope]]
+- [[#2. Method|2. Method]]
+```
+
+From then on, numbering, renumbering or removing the numbers rewrites the list
+in the same edit, so its links never go stale. The list goes after whichever
+line ends with `^toc`: rename the label, or make it a heading such as
+`## Contents ^toc`, and it still works.
 
 ## Settings
 
@@ -113,8 +132,9 @@ is numbered from heading 2 down to heading 3, starting at C, with numbers
 after the first written 1, 2, 3. The style may end in a separator (`1.1.`,
 `1.1)`, `1.1:`, `1.1 —`, `1.1 -`); without one there is none, as Number
 Headings writes it. `_.1.1` starts numbering one level lower.
-`number headings: off` leaves the note alone. `auto`, `contents` and `skip`
-are accepted and ignored.
+`number headings: off` leaves the note alone. `contents ^toc` (any block id)
+says where the table of contents goes, as Number Headings reads it, so an
+existing one is kept up to date. `auto` and `skip` are accepted and ignored.
 
 Automatic numbering as you type is not included: rewriting links in other notes
 on every keystroke is not something a plugin should do behind your back.

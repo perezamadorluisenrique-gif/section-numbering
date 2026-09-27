@@ -1,7 +1,8 @@
 import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 
-import { noteSettings } from './src/frontmatter.ts';
+import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
+import { contentsAnchor, noteSettings } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
@@ -44,7 +45,44 @@ export default class SectionNumberingPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'table-of-contents',
+      name: 'Insert or update table of contents',
+      icon: 'list-tree',
+      editorCallback: (editor) => {
+        const text = editor.getValue();
+        const settings = this.settingsFor(text);
+        if (!settings) return;
+        const anchor = this.anchorFor(text);
+        if (hasContents(text, anchor)) {
+          const edit = updateContents(text, text, settings, anchor);
+          if (edit) {
+            editor.transaction({
+              changes: [{ from: editor.offsetToPos(edit.from), to: editor.offsetToPos(edit.to), text: edit.insert }],
+            });
+          }
+          new Notice(edit ? 'Updated the table of contents.' : 'The table of contents is up to date.');
+          return;
+        }
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+        const block = newContents(text, settings, anchor);
+        if (line.trim() === '') {
+          editor.transaction({ changes: [{ from: { line: cursor.line, ch: 0 }, text: block }] });
+        } else {
+          const end = { line: cursor.line, ch: line.length };
+          editor.transaction({ changes: [{ from: end, text: '\n' + block.replace(/\n$/, '') }] });
+        }
+        new Notice('Inserted a table of contents. Numbering the headings keeps it up to date.');
+      },
+    });
+
     this.addSettingTab(new SectionNumberingSettingTab(this.app, this));
+  }
+
+  /** The block id the table of contents follows: the note's own, or `^toc`. */
+  private anchorFor(text: string): string {
+    return (this.settings.readFrontMatter && contentsAnchor(text)) || DEFAULT_ANCHOR;
   }
 
   /**
@@ -83,16 +121,28 @@ export default class SectionNumberingPlugin extends Plugin {
    * reach them, which the notice says.
    */
   private async apply(editor: Editor, file: TFile | null, plan: Plan, verb: string): Promise<void> {
+    const text = editor.getValue();
+    // The table of contents, if the note has one, follows the headings as
+    // they will be after this edit, in the same transaction.
+    const settings = this.settingsFor(text) ?? this.settings;
+    const contents = updateContents(text, applyEdits(text, plan.edits), settings, this.anchorFor(text));
     if (plan.changed === 0) {
-      new Notice('No heading needed changing.');
+      if (contents) {
+        editor.transaction({
+          changes: [{ from: editor.offsetToPos(contents.from), to: editor.offsetToPos(contents.to), text: contents.insert }],
+        });
+        new Notice('No heading needed changing. Updated the table of contents.');
+      } else {
+        new Notice('No heading needed changing.');
+      }
       return;
     }
 
-    const text = editor.getValue();
-    const own = file
-      ? retargetLinks(text, plan.renames, (path) => path === '' || this.resolves(path, file.path, file))
-      : [];
-    const edits = [...plan.edits, ...own];
+    // Links inside the table of contents are rewritten with it, not here.
+    const own = (
+      file ? retargetLinks(text, plan.renames, (path) => path === '' || this.resolves(path, file.path, file)) : []
+    ).filter((edit) => !contents || edit.to <= contents.from || edit.from >= contents.to);
+    const edits = [...plan.edits, ...own, ...(contents ? [contents] : [])];
     editor.transaction({
       changes: edits.map((edit) => ({
         from: editor.offsetToPos(edit.from),
