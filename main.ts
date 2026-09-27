@@ -1,6 +1,7 @@
 import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 import type { SettingDefinitionItem } from 'obsidian';
 
+import { noteSettings } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
@@ -10,9 +11,11 @@ import type { NumberStyle, NumberingSettings, Plan, Separator } from './src/numb
 interface SectionNumberingSettings extends NumberingSettings {
   /** Rewrite links in other notes that point at a renumbered heading. */
   updateLinks: boolean;
+  /** Follow a note's `number headings` front matter, as Number Headings wrote it. */
+  readFrontMatter: boolean;
 }
 
-const DEFAULT_SETTINGS: SectionNumberingSettings = { ...DEFAULT_NUMBERING, updateLinks: true };
+const DEFAULT_SETTINGS: SectionNumberingSettings = { ...DEFAULT_NUMBERING, updateLinks: true, readFrontMatter: true };
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -27,7 +30,8 @@ export default class SectionNumberingPlugin extends Plugin {
       name: 'Number headings in this note',
       icon: 'list-ordered',
       editorCallback: (editor, ctx) => {
-        void this.apply(editor, ctx.file, planNumbering(editor.getValue(), this.settings), 'Numbered');
+        const settings = this.settingsFor(editor.getValue());
+        if (settings) void this.apply(editor, ctx.file, planNumbering(editor.getValue(), settings), 'Numbered');
       },
     });
     this.addCommand({
@@ -35,11 +39,28 @@ export default class SectionNumberingPlugin extends Plugin {
       name: 'Remove heading numbers in this note',
       icon: 'list-x',
       editorCallback: (editor, ctx) => {
-        void this.apply(editor, ctx.file, planRemoval(editor.getValue(), this.settings), 'Removed numbers from');
+        const settings = this.settingsFor(editor.getValue());
+        if (settings) void this.apply(editor, ctx.file, planRemoval(editor.getValue(), settings), 'Removed numbers from');
       },
     });
 
     this.addSettingTab(new SectionNumberingSettingTab(this.app, this));
+  }
+
+  /**
+   * The settings for one note: the plugin's, with the note's own
+   * `number headings` front matter over them. Null, after saying why, when
+   * the note asks to be left alone.
+   */
+  private settingsFor(text: string): NumberingSettings | null {
+    if (!this.settings.readFrontMatter) return this.settings;
+    const own = noteSettings(text);
+    if (own === null) return this.settings;
+    if (own.off) {
+      new Notice('This note has "number headings: off" in its properties, so its headings were left alone.');
+      return null;
+    }
+    return { ...this.settings, ...own.settings };
   }
 
   async loadSettings() {
@@ -190,6 +211,13 @@ const SETTINGS: SettingRow[] = [
       'What follows the number. With no separator, a heading that already starts with a number, ' +
       'such as "2024 in review", is taken to be numbered and loses it.',
     options: SEPARATOR_OPTIONS,
+  },
+  {
+    key: 'readFrontMatter',
+    name: 'Follow Number Headings properties',
+    desc:
+      'A note whose properties have a "number headings" entry, as the Number Headings plugin writes it, ' +
+      'is numbered the way that entry says, and "number headings: off" leaves the note alone.',
   },
   {
     key: 'updateLinks',

@@ -21,6 +21,8 @@ export interface NumberingSettings {
   topStyle: NumberStyle;
   otherStyle: NumberStyle;
   separator: Separator;
+  /** The first top-level number. Optional so stored settings from 0.1 still type-check. */
+  startAt?: number;
 }
 
 export const DEFAULT_NUMBERING: NumberingSettings = {
@@ -246,7 +248,7 @@ export function planNumbering(text: string, settings: NumberingSettings): Plan {
 
     const depth = heading.level - first;
     counters = counters.slice(0, depth + 1);
-    while (counters.length <= depth) counters.push(0);
+    while (counters.length <= depth) counters.push(counters.length === 0 ? (settings.startAt ?? 1) - 1 : 0);
     counters[depth]++;
 
     const prefix =

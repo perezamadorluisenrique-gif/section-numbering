@@ -63,6 +63,7 @@ numbers, to change them back.
 | Top-level numbers | 1, 2, 3 | Or A, B, C, or I, II, III. |
 | Lower-level numbers | 1, 2, 3 | The same choice for every level below. |
 | Separator | `1.2. Heading` | Also `)`, `:`, ` —`, ` -` or none. |
+| Follow Number Headings properties | On | A note's `number headings` property overrides the settings above for that note. See [Coming from Number Headings](#coming-from-number-headings). |
 | Update links in other notes | On | Links within the note are always updated. |
 
 ### Why the default separator is a dot
@@ -100,6 +101,21 @@ numbers in this note* while it is still none, then change it and number again.
 While the separator is none, a heading that starts with a number, such as a
 year, is read as numbered.
 
+Notes that carry Number Headings' own settings in their properties keep
+them. With **Follow Number Headings properties** on (the default), a note
+whose front matter says, for example,
+
+```yaml
+number headings: auto, first-level 2, max 3, start-at 3, A.1
+```
+
+is numbered from heading 2 down to heading 3, starting at C, with numbers
+after the first written 1, 2, 3. The style may end in a separator (`1.1.`,
+`1.1)`, `1.1:`, `1.1 —`, `1.1 -`); without one there is none, as Number
+Headings writes it. `_.1.1` starts numbering one level lower.
+`number headings: off` leaves the note alone. `auto`, `contents` and `skip`
+are accepted and ignored.
+
 Automatic numbering as you type is not included: rewriting links in other notes
 on every keystroke is not something a plugin should do behind your back.
 
@@ -125,6 +141,19 @@ npm run build
 
 Everything under `src/` is free of Obsidian imports and fully unit tested;
 `main.ts` is the only file that talks to the app.
+
+## More plugins by Siulved54
+
+| Plugin | What it does | Source |
+| --- | --- | --- |
+| [Shared Blocks](https://obsidian.md/plugins?id=shared-blocks) | Write a block of text once and reuse it in any note. Edit the source and every reference re-renders live. | [shared-blocks](https://github.com/perezamadorluisenrique-gif/shared-blocks) |
+| [Text Case and Cleanup](https://obsidian.md/plugins?id=text-format) | Change case, make camelCase or slugs, sort lines and remove duplicates, and repair text pasted out of a PDF, without touching code or URLs. | [text-format](https://github.com/perezamadorluisenrique-gif/text-format) |
+| [Typography as You Type](https://obsidian.md/plugins?id=typography-as-you-type) | Curly quotes, dashes and ellipses as you type, kept out of code and maths, with Backspace to take one back. | [smart-typography-plugin](https://github.com/perezamadorluisenrique-gif/smart-typography-plugin) |
+| [Spreadsheet to Table](https://obsidian.md/plugins?id=spreadsheet-to-table) | Paste cells from Excel or Google Sheets as a Markdown table with a real header, insert CSV files, and copy tables back out. | [spreadsheet-to-table](https://github.com/perezamadorluisenrique-gif/spreadsheet-to-table) |
+| [Hybrid Line Numbers](https://obsidian.md/plugins?id=hybrid-line-numbers) | Relative and hybrid line numbers for Vim-style jumps, where a folded section counts as one line. | [hybrid-line-numbers](https://github.com/perezamadorluisenrique-gif/hybrid-line-numbers) |
+
+All of them are in the community directory: Settings -> Community plugins ->
+Browse, then search for the name.
 
 ## License
 
