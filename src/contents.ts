@@ -11,7 +11,7 @@
 import { linkText } from './links.ts';
 import { scanLines } from './markdown.ts';
 import type { Edit } from './markdown.ts';
-import { firstLevelOf, parseHeadings } from './numbering.ts';
+import { firstLevelOf, isSkipped, parseHeadings } from './numbering.ts';
 import type { NumberingSettings } from './numbering.ts';
 
 export const DEFAULT_ANCHOR = 'toc';
@@ -47,7 +47,9 @@ export function hasContents(text: string, anchor = DEFAULT_ANCHOR): boolean {
 
 /**
  * The list itself, one line per heading in the numbered range, indented one
- * tab per level below the first. `headingsFrom` is the text whose headings
+ * tab per level below the first. Headings marked with the skip anchor, and
+ * the heading that carries the table of contents' own anchor
+ * (`## Contents ^toc`), are left out. `headingsFrom` is the text whose headings
  * are listed; it may differ from the text the list is written into, when
  * the numbers are changing in the same edit.
  */
@@ -56,7 +58,14 @@ export function contentsList(headingsFrom: string, settings: NumberingSettings, 
   const first = firstLevelOf(headings, settings);
   const own = new RegExp(`\\s\\^${escape(anchor)}$`);
   return headings
-    .filter((h) => h.level >= first && h.level <= settings.maxLevel && h.text.trim() !== '' && !own.test(h.text))
+    .filter(
+      (h) =>
+        h.level >= first &&
+        h.level <= settings.maxLevel &&
+        h.text.trim() !== '' &&
+        !own.test(h.text) &&
+        !isSkipped(h.text, settings.skipAnchor),
+    )
     .map((h) => {
       const target = linkText(h.text);
       const label = h.text.replace(/\|/g, '-').replace(/\]\]/g, ']').trim();

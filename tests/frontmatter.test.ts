@@ -46,10 +46,10 @@ test('_.1.1 starts numbering one level lower', () => {
   assert.ok(t && !t.off && t.settings.firstLevel === 3);
 });
 
-test('contents, skip, quotes and unknown parts are ignored', () => {
+test('contents, quotes and unknown parts are ignored; skip is read', () => {
   assert.deepEqual(noteSettings(note('"auto, contents ^toc, skip ^skipped, max 3"')), {
     off: false,
-    settings: { separator: '', maxLevel: 3 },
+    settings: { separator: '', maxLevel: 3, skipAnchor: 'skipped' },
   });
 });
 

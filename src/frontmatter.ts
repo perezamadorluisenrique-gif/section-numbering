@@ -16,9 +16,16 @@
  *   `1.1)`, `1.1:`, `1.1 —`, `1.1 -`). A leading `_.` (`_.1.1`) leaves the
  *   top level unnumbered, which here means numbering starts one level lower.
  *
- * `auto` and `skip …` are accepted and ignored: this plugin numbers on
- * command. `contents ^id` is read by `contentsAnchor`: the table of contents
- * goes after the line that ends with that block id.
+ * - `skip ^id`: headings whose line ends with that block id are not numbered
+ *   (`skip none` turns skipping off for the note).
+ *
+ * `auto` is accepted and ignored: this plugin numbers on command.
+ * `contents ^id` is read by `contentsAnchor`: the table of contents goes
+ * after the line that ends with that block id.
+ *
+ * `first-level auto` (the shallowest heading) is our own addition, so that
+ * `settingsToValue` can write every global setting back; Number Headings
+ * ignores that part.
  *
  * A note with the key and no separator in its style gets none, which is what
  * Number Headings writes by default (`1 Introduction`).
@@ -58,8 +65,38 @@ export function frontMatterValue(text: string): string | null {
  */
 export function contentsAnchor(text: string): string | null {
   const value = frontMatterValue(text);
-  const match = value === null ? null : /(?:^|,)\s*contents\s+\^?([\w-]+)/i.exec(value);
+  return value === null ? null : valueContentsAnchor(value);
+}
+
+/** The `contents ^id` part of a `number headings` value, or null. */
+export function valueContentsAnchor(value: string): string | null {
+  const match = /(?:^|,)\s*contents\s+\^?([\w-]+)/i.exec(value);
   return match ? match[1] : null;
+}
+
+/** The property key as it is already spelled in the note's front matter, if it is there. */
+export function isFrontMatterKey(key: string): boolean {
+  return KEY_LINE.test(`${key}:`);
+}
+
+const STYLE_SEPARATOR: Record<string, string> = { '.': '.', ')': ')', ':': ':', ' —': ' —', ' -': ' -', '': '' };
+
+/**
+ * The `number headings` value that makes a note follow `settings`, in the
+ * form `noteSettings` reads back: `parse(write(settings))` gives the same
+ * settings. A missing `startAt` is written as 1 and a missing `skipAnchor`
+ * as `skip none`. `contents` carries a note's existing `contents ^id` over.
+ */
+export function settingsToValue(settings: NumberingSettings, contents?: string | null): string {
+  const parts = [
+    `first-level ${settings.firstLevel}`,
+    `max ${settings.maxLevel}`,
+    ...(contents ? [`contents ^${contents}`] : []),
+    `skip ${settings.skipAnchor ? `^${settings.skipAnchor}` : 'none'}`,
+    `start-at ${settings.startAt ?? 1}`,
+    `${settings.topStyle}.${settings.otherStyle}${STYLE_SEPARATOR[settings.separator]}`,
+  ];
+  return parts.join(', ');
 }
 
 /** The note's own settings, or null when its front matter has no `number headings` key. */
@@ -78,7 +115,8 @@ export function noteSettings(text: string): NoteSettings | null {
         return { off: true };
       case 'first-level': {
         const level = asLevel(n);
-        if (level) settings.firstLevel = level;
+        if (arg === 'auto') settings.firstLevel = 'auto';
+        else if (level) settings.firstLevel = level;
         break;
       }
       case 'max': {
@@ -88,6 +126,10 @@ export function noteSettings(text: string): NoteSettings | null {
       }
       case 'start-at':
         if (Number.isInteger(n) && n >= 0) settings.startAt = n;
+        break;
+      case 'skip':
+        if (arg === 'none') settings.skipAnchor = '';
+        else if (arg && /^\^[\w-]+$/.test(arg)) settings.skipAnchor = arg.slice(1);
         break;
       default: {
         const style = STYLE.exec(part);

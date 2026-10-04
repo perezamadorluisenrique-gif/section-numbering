@@ -4,6 +4,12 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.4.0
+
+- **Skip individual headings.** A heading whose line ends with `^skipped` (the anchor Number Headings uses; change it in the settings or with `skip ^name` in a note's `number headings` property) is not numbered and takes no number, and a number it already had is removed. Its subheadings are still numbered, as in Number Headings. The anchor is never touched and links to the heading are left alone.
+- **Table of contents.** It now leaves out skipped headings and the heading that carries its own anchor, such as `## Contents ^toc`.
+- **Save numbering settings to this note's properties.** A new command writes the current settings into the note's `number headings` property, in the form the plugin reads back, keeping an existing `contents ^id`. This needs Obsidian 1.4.4 or later.
+
 ## 0.3.0
 
 - **Table of contents.** The new command *Insert or update table of contents*
