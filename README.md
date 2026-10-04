@@ -47,6 +47,7 @@ Block references (`#^id`) are not headings and are never touched.
 | Number headings in this note | Numbers every heading in range, or renumbers it if it is already numbered. |
 | Remove heading numbers in this note | Takes the numbers off again. |
 | Insert or update table of contents | Inserts a list of links to the headings at the cursor, or brings the existing one up to date. |
+| Save numbering settings to this note's properties | Writes the plugin's current settings into the note's `number headings` property, so the note keeps numbering this way whatever the settings become. |
 
 None has a hotkey by default; assign one in **Settings → Hotkeys**.
 
@@ -82,8 +83,51 @@ line ends with `^toc`: rename the label, or make it a heading such as
 | Top-level numbers | 1, 2, 3 | Or A, B, C, or I, II, III. |
 | Lower-level numbers | 1, 2, 3 | The same choice for every level below. |
 | Separator | `1.2. Heading` | Also `)`, `:`, ` —`, ` -` or none. |
+| Skip anchor | `^skipped` | A heading whose line ends with this block id is left unnumbered. See [Skipping headings](#skipping-headings). Empty turns it off. |
 | Follow Number Headings properties | On | A note's `number headings` property overrides the settings above for that note. See [Coming from Number Headings](#coming-from-number-headings). |
 | Update links in other notes | On | Links within the note are always updated. |
+
+### Skipping headings
+
+End a heading's line with the skip anchor and it is not numbered, takes no
+number, and stays out of the table of contents:
+
+```markdown
+# Guide
+## Preface ^skipped
+## Setup
+```
+
+numbers as `# 1. Guide`, `## Preface ^skipped`, `## 1.1. Setup`. The anchor is
+a block id, so it needs a space before it. Numbering a heading that already
+had a number removes it once the anchor is there, and numbering again never
+puts one back; the anchor itself is never touched. Links to a skipped heading
+are left as they are.
+
+As in Number Headings, a skipped heading is ignored altogether, as if the line
+were not a heading. Its subheadings are still numbered, and carry on from the
+nearest numbered heading above it, not from the skipped one. Mark each of
+them to leave a whole section unnumbered. A skipped heading never decides
+where numbering starts, so a skipped `# Title` above numbered `##` sections
+does not make them `0.1`, `0.2`.
+
+The anchor is `^skipped` by default, the example Number Headings uses.
+Change it in the settings, or per note with `skip ^name` in the `number
+headings` property (`skip none` turns it off for the note).
+
+### Saving the settings to a note
+
+*Save numbering settings to this note's properties* writes the plugin's
+settings as a `number headings` property, for example
+
+```yaml
+number headings: first-level auto, max 6, skip ^skipped, start-at 1, 1.1.
+```
+
+An existing `contents ^id` part is kept; the rest is replaced. `first-level
+auto` is our own spelling for "the shallowest heading"; Number Headings
+ignores it. The property only applies while **Follow Number Headings
+properties** is on.
 
 ### Why the default separator is a dot
 
@@ -107,6 +151,7 @@ are not an outline.
   and are never numbered. Setext headings (text underlined with `===`) are not
   numbered either.
 - Empty headings are skipped and take no number.
+- The table of contents leaves out the heading that carries its own anchor (`## Contents ^toc`) as well as skipped headings.
 - When two headings share a name, a link to that name went to the first of
   them, and it still does after numbering.
 
@@ -134,7 +179,7 @@ after the first written 1, 2, 3. The style may end in a separator (`1.1.`,
 Headings writes it. `_.1.1` starts numbering one level lower.
 `number headings: off` leaves the note alone. `contents ^toc` (any block id)
 says where the table of contents goes, as Number Headings reads it, so an
-existing one is kept up to date. `auto` and `skip` are accepted and ignored.
+existing one is kept up to date. `skip ^id` is honoured. `auto` is accepted and ignored.
 
 Automatic numbering as you type is not included: rewriting links in other notes
 on every keystroke is not something a plugin should do behind your back.

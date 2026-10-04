@@ -2,7 +2,7 @@ import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'o
 import type { SettingDefinitionItem } from 'obsidian';
 
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
-import { contentsAnchor, noteSettings } from './src/frontmatter.ts';
+import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
@@ -77,7 +77,55 @@ export default class SectionNumberingPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: 'save-settings-to-properties',
+      name: "Save numbering settings to this note's properties",
+      icon: 'save',
+      editorCheckCallback: (checking, _editor, ctx) => {
+        const file = ctx.file;
+        if (!file) return false;
+        if (!checking) void this.saveSettingsToProperties(file);
+        return true;
+      },
+    });
+
     this.addSettingTab(new SectionNumberingSettingTab(this.app, this));
+  }
+
+  /**
+   * Writes the plugin's current settings into the note's `number headings`
+   * property, in the form `settingsToValue` produces and `noteSettings`
+   * reads. An existing `contents ^id` part is kept; any other part is
+   * replaced, `off` included. Needs no setting to be on: it is how a note
+   * is made to follow its own settings.
+   */
+  private async saveSettingsToProperties(file: TFile): Promise<void> {
+    const s = this.settings;
+    const numbering: NumberingSettings = {
+      firstLevel: s.firstLevel,
+      maxLevel: s.maxLevel,
+      topStyle: s.topStyle,
+      otherStyle: s.otherStyle,
+      separator: s.separator,
+      startAt: s.startAt,
+      skipAnchor: s.skipAnchor,
+    };
+    try {
+      await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+        const key = Object.keys(fm).find(isFrontMatterKey) ?? FRONT_MATTER_KEY;
+        const old = fm[key];
+        const contents = typeof old === 'string' ? valueContentsAnchor(old) : null;
+        fm[key] = settingsToValue(numbering, contents);
+      });
+      new Notice(
+        this.settings.readFrontMatter
+          ? 'Saved the numbering settings to this note\'s properties.'
+          : 'Saved the numbering settings to this note\'s properties. They only apply while "Follow Number Headings properties" is on.',
+      );
+    } catch (error) {
+      console.error('section-numbering: could not save the settings to the properties', error);
+      new Notice("Could not write this note's properties. Check that they are valid YAML.");
+    }
   }
 
   /** The block id the table of contents follows: the note's own, or `^toc`. */
@@ -224,8 +272,9 @@ interface SettingRow {
   key: SettingKey;
   name: string;
   desc: string;
-  /** A dropdown's options, value to label; none means a toggle. */
+  /** A dropdown's options, value to label; with no options this is a toggle, or a text box when `text` is set. */
   options?: Record<string, string>;
+  text?: boolean;
 }
 
 /**
@@ -263,6 +312,14 @@ const SETTINGS: SettingRow[] = [
     options: SEPARATOR_OPTIONS,
   },
   {
+    key: 'skipAnchor',
+    name: 'Skip anchor',
+    desc:
+      'A heading whose line ends with this block id, such as "## Preface ^skipped", is not numbered and takes no number. ' +
+      'It stays out of the table of contents. Leave empty to turn skipping off.',
+    text: true,
+  },
+  {
     key: 'readFrontMatter',
     name: 'Follow Number Headings properties',
     desc:
@@ -277,6 +334,12 @@ const SETTINGS: SettingRow[] = [
       'Links within the note itself are always updated.',
   },
 ];
+
+/** What a control shows: numbers as strings, the skip anchor with its `^`. */
+function displayValue(key: string, value: unknown): unknown {
+  if (key === 'skipAnchor') return value ? `^${(value as string)}` : '';
+  return typeof value === 'number' ? String(value) : value;
+}
 
 /** Levels are stored as numbers, but a dropdown only deals in strings. */
 function toStored(key: SettingKey, value: unknown): unknown {
@@ -298,18 +361,25 @@ class SectionNumberingSettingTab extends PluginSettingTab {
     return SETTINGS.map((row) => ({
       name: row.name,
       desc: row.desc,
-      control: row.options
+      control: row.text
+        ? { type: 'text' as const, key: row.key, placeholder: '^skipped', defaultValue: '^skipped' }
+        : row.options
         ? { type: 'dropdown' as const, key: row.key, options: row.options, defaultValue: String(DEFAULT_SETTINGS[row.key]) }
         : { type: 'toggle' as const, key: row.key, defaultValue: DEFAULT_SETTINGS[row.key] as boolean },
     }));
   }
 
   getControlValue(key: string): unknown {
-    const value = this.plugin.settings[key as SettingKey];
-    return typeof value === 'number' ? String(value) : value;
+    return displayValue(key, this.plugin.settings[key as SettingKey]);
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
+    if (key === 'skipAnchor') {
+      // "^skipped" or "skipped"; anything that is not a block id is not taken.
+      const id = (typeof value === 'string' ? value : '').trim().replace(/^\^/, '');
+      if (id !== '' && !/^[\w-]+$/.test(id)) return;
+      value = id;
+    }
     Object.assign(this.plugin.settings, { [key]: toStored(key as SettingKey, value) });
     await this.plugin.saveSettings();
   }
@@ -327,6 +397,13 @@ class SectionNumberingSettingTab extends PluginSettingTab {
         setting.addDropdown((dropdown) => {
           dropdown
             .addOptions(options)
+            .setValue(String(current))
+            .onChange((value) => this.setControlValue(row.key, value));
+        });
+      } else if (row.text) {
+        setting.addText((text) => {
+          text
+            .setPlaceholder('^skipped')
             .setValue(String(current))
             .onChange((value) => this.setControlValue(row.key, value));
         });

@@ -23,6 +23,12 @@ export interface NumberingSettings {
   separator: Separator;
   /** The first top-level number. Optional so stored settings from 0.1 still type-check. */
   startAt?: number;
+  /**
+   * The block id, without the `^`, that marks a heading to leave unnumbered:
+   * `skipped` skips every heading whose line ends with `^skipped`. Empty or
+   * missing turns skipping off.
+   */
+  skipAnchor?: string;
 }
 
 export const DEFAULT_NUMBERING: NumberingSettings = {
@@ -31,7 +37,18 @@ export const DEFAULT_NUMBERING: NumberingSettings = {
   topStyle: '1',
   otherStyle: '1',
   separator: '.',
+  skipAnchor: 'skipped',
 };
+
+/**
+ * Whether a heading's text ends with the block id that marks it as skipped.
+ * Like any block id it must follow whitespace (or be all there is), so
+ * `## Fix a^skipped` is an ordinary heading.
+ */
+export function isSkipped(text: string, anchor: string | undefined): boolean {
+  if (!anchor) return false;
+  return new RegExp(`(?:^|\\s)\\^${escapeRegExp(anchor)}$`).test(text.replace(/\s+$/, ''));
+}
 
 export interface Heading {
   /** Zero-based line number. */
@@ -152,7 +169,10 @@ export interface Plan {
 
 export function firstLevelOf(headings: Heading[], settings: NumberingSettings): number {
   if (settings.firstLevel !== 'auto') return settings.firstLevel;
-  const levels = headings.filter((h) => h.level <= settings.maxLevel).map((h) => h.level);
+  // A skipped heading, often the note's title, must not decide where the numbering starts.
+  const levels = headings
+    .filter((h) => h.level <= settings.maxLevel && !isSkipped(h.text, settings.skipAnchor))
+    .map((h) => h.level);
   return levels.length ? Math.min(...levels) : 1;
 }
 
@@ -171,14 +191,21 @@ export function firstLevelOf(headings: Heading[], settings: NumberingSettings): 
 function existingPrefixes(headings: Heading[], settings: NumberingSettings, first: number): number[] {
   const pattern = numberPrefixPattern(settings);
   const inRange = (h: Heading) => h.level >= first && h.level <= settings.maxLevel;
+  const skipped = headings.map((h) => isSkipped(h.text, settings.skipAnchor));
   const lengths = headings.map((h) => (inRange(h) ? existingPrefixLength(h.text, pattern) : 0));
   if (settings.separator === '') return lengths;
 
+  // Skipped headings are the unnumbered ones, so they neither break "numbered
+  // throughout" nor count as versions. They only lose a number this plugin
+  // writes with a separator, never a bare `2.0`.
+  const counted = lengths.map((length, i) => (skipped[i] ? 0 : length));
   const numberedThroughout = headings.every(
-    (h, i) => !inRange(h) || lengths[i] > 0 || h.text.trim() === '',
+    (h, i) => !inRange(h) || skipped[i] || counted[i] > 0 || h.text.trim() === '',
   );
-  if (numberedThroughout && !looksLikeVersions(headings, lengths, first)) return lengths;
-  return lengths.map((length, i) => (isUnmarked(headings[i].text.slice(0, length)) ? 0 : length));
+  const keepAll = numberedThroughout && !looksLikeVersions(headings, counted, first);
+  return lengths.map((length, i) =>
+    (keepAll && !skipped[i]) || !isUnmarked(headings[i].text.slice(0, length)) ? length : 0,
+  );
 }
 
 /**
@@ -228,6 +255,14 @@ function recordRename(plan: Plan, heading: Heading, next: string): void {
  * A heading above the first level starts the count again, so with the first
  * level set to 2 each `#` chapter numbers its own sections from 1. Headings
  * with no text are skipped.
+ *
+ * A heading marked with the skip anchor (`## Preface ^skipped`) is not
+ * numbered and takes no number, and a number this plugin gave it earlier is
+ * taken off. As in Number Headings it is ignored altogether, as if the line
+ * were not a heading: its subheadings are still numbered, and they carry on
+ * from the nearest numbered heading above, not from the skipped one. A
+ * skipped heading above the first level still restarts the count, like any
+ * other.
  */
 export function planNumbering(text: string, settings: NumberingSettings): Plan {
   const plan: Plan = { edits: [], renames: new Map(), changed: 0 };
@@ -245,6 +280,13 @@ export function planNumbering(text: string, settings: NumberingSettings): Plan {
 
     const existing = prefixes[index];
     if (heading.text.slice(existing).trim() === '') return;
+    if (isSkipped(heading.text, settings.skipAnchor)) {
+      if (existing > 0) {
+        plan.edits.push({ from: heading.from, to: heading.from + existing, insert: '' });
+        recordRename(plan, heading, heading.text.slice(existing));
+      }
+      return;
+    }
 
     const depth = heading.level - first;
     counters = counters.slice(0, depth + 1);
