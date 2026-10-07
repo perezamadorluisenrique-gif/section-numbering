@@ -1,30 +1,108 @@
-import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-import type { SettingDefinitionItem } from 'obsidian';
+import { App, Editor, MarkdownRenderChild, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import type { MarkdownPostProcessorContext, SettingDefinitionItem } from 'obsidian';
+
+import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
 
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
 import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
+import { LIVE_CONTENTS_LANGUAGE, headingLink, liveContentsEntries, newLiveBlock, parseLiveOptions } from './src/live.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
-import { DEFAULT_NUMBERING, planNumbering, planRemoval } from './src/numbering.ts';
-import type { NumberStyle, NumberingSettings, Plan, Separator } from './src/numbering.ts';
+import { DEFAULT_NUMBERING, planNumbering, planRemoval, shownNumbers } from './src/numbering.ts';
+import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
 
 interface SectionNumberingSettings extends NumberingSettings {
   /** Rewrite links in other notes that point at a renumbered heading. */
   updateLinks: boolean;
   /** Follow a note's `number headings` front matter, as Number Headings wrote it. */
   readFrontMatter: boolean;
+  /** Draw the numbers in front of headings that have none, without changing the note. */
+  showNumbers: boolean;
 }
 
-const DEFAULT_SETTINGS: SectionNumberingSettings = { ...DEFAULT_NUMBERING, updateLinks: true, readFrontMatter: true };
+const DEFAULT_SETTINGS: SectionNumberingSettings = {
+  ...DEFAULT_NUMBERING,
+  updateLinks: true,
+  readFrontMatter: true,
+  showNumbers: false,
+};
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
 export default class SectionNumberingPlugin extends Plugin {
   settings: SectionNumberingSettings = { ...DEFAULT_SETTINGS };
+  /** Bumped whenever the settings change, so editors and live blocks draw again. */
+  private version = 0;
+  private liveBlocks = new Set<LiveContents>();
+  /** The last note text whose shown numbers were worked out, for reading view. */
+  private shownCache: { text: string; byLine: Map<number, string> } | null = null;
 
   async onload() {
     await this.loadSettings();
+
+    this.registerEditorExtension(
+      shownNumbersExtension(
+        (text) => this.numbersToShow(text),
+        () => this.version,
+      ),
+    );
+    this.registerMarkdownPostProcessor((el, ctx) => this.numberReadingView(el, ctx));
+    this.registerMarkdownCodeBlockProcessor(LIVE_CONTENTS_LANGUAGE, (source, el, ctx) => {
+      ctx.addChild(new LiveContents(this, el, source, ctx.sourcePath));
+    });
+    this.registerEvent(
+      this.app.metadataCache.on('changed', (file, data) => {
+        for (const block of this.liveBlocks) if (block.sourcePath === file.path) block.draw(data);
+      }),
+    );
+
+    this.addCommand({
+      id: 'toggle-shown-numbers',
+      name: 'Show or hide heading numbers (without changing notes)',
+      icon: 'hash',
+      callback: async () => {
+        this.settings.showNumbers = !this.settings.showNumbers;
+        await this.saveSettings();
+        new Notice(
+          this.settings.showNumbers
+            ? 'Showing heading numbers. Your notes are not changed.'
+            : 'Heading numbers are no longer shown.',
+        );
+      },
+    });
+    this.addCommand({
+      id: 'insert-live-contents',
+      name: 'Insert live table of contents',
+      icon: 'list-tree',
+      editorCallback: (editor) => {
+        const cursor = editor.getCursor();
+        const line = editor.getLine(cursor.line);
+        const block = newLiveBlock();
+        if (line.trim() === '') {
+          editor.transaction({ changes: [{ from: { line: cursor.line, ch: 0 }, text: block }] });
+        } else {
+          editor.transaction({
+            changes: [{ from: { line: cursor.line, ch: line.length }, text: '\n' + block.replace(/\n$/, '') }],
+          });
+        }
+      },
+    });
+    this.addCommand({
+      id: 'copy-with-numbers',
+      name: 'Copy this note with heading numbers',
+      icon: 'clipboard-copy',
+      editorCallback: (editor) => {
+        const text = editor.getValue();
+        const settings = this.settingsFor(text);
+        if (!settings) return;
+        const numbered = applyEdits(text, planNumbering(text, settings).edits);
+        navigator.clipboard.writeText(numbered).then(
+          () => new Notice('Copied the note with its headings numbered. The note itself is unchanged.'),
+          () => new Notice('Could not write to the clipboard.'),
+        );
+      },
+    });
 
     this.addCommand({
       id: 'number-headings',
@@ -138,15 +216,71 @@ export default class SectionNumberingPlugin extends Plugin {
    * `number headings` front matter over them. Null, after saying why, when
    * the note asks to be left alone.
    */
-  private settingsFor(text: string): NumberingSettings | null {
+  private settingsFor(text: string, quiet = false): NumberingSettings | null {
     if (!this.settings.readFrontMatter) return this.settings;
     const own = noteSettings(text);
     if (own === null) return this.settings;
     if (own.off) {
-      new Notice('This note has "number headings: off" in its properties, so its headings were left alone.');
+      if (!quiet) new Notice('This note has "number headings: off" in its properties, so its headings were left alone.');
       return null;
     }
     return { ...this.settings, ...own.settings };
+  }
+
+  /** The numbers to draw for a note's text: none unless showing is on and the note allows it. */
+  numbersToShow(text: string): ShownNumber[] {
+    if (!this.settings.showNumbers) return [];
+    const settings = this.settingsFor(text, true);
+    return settings ? shownNumbers(text, settings) : [];
+  }
+
+  /** The live table of contents' entries for a note's text. */
+  liveEntries(text: string, source: string) {
+    const settings = this.settingsFor(text, true) ?? this.settings;
+    return liveContentsEntries(text, settings, parseLiveOptions(source), this.numbersToShow(text).length > 0);
+  }
+
+  addLiveBlock(block: LiveContents) {
+    this.liveBlocks.add(block);
+  }
+
+  removeLiveBlock(block: LiveContents) {
+    this.liveBlocks.delete(block);
+  }
+
+  /**
+   * Reading view: puts the shown number in front of each rendered heading.
+   * A heading's section knows its line in the note, and the note's text,
+   * which is what the numbers are worked out from. Where there is no section
+   * (an embed, a hover preview), nothing is drawn: the line would be a guess.
+   */
+  private numberReadingView(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
+    if (!this.settings.showNumbers) return;
+    const headings = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    if (headings.length === 0) return;
+    const info = ctx.getSectionInfo(el);
+    if (!info) return;
+    if (this.shownCache?.text !== info.text) {
+      const byLine = new Map<number, string>();
+      for (const { heading, number } of this.numbersToShow(info.text)) byLine.set(heading.line, number);
+      this.shownCache = { text: info.text, byLine };
+    }
+    const number = this.shownCache.byLine.get(info.lineStart);
+    if (number === undefined) return;
+    const heading = headings[0];
+    if (heading.querySelector(`.${NUMBER_CLASS}`)) return;
+    heading.prepend(createSpan({ cls: NUMBER_CLASS, text: number, attr: { 'aria-hidden': 'true' } }));
+  }
+
+  /** Draws every open note again after the settings changed. */
+  private redraw(): void {
+    this.version++;
+    this.shownCache = null;
+    this.app.workspace.updateOptions();
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      if (leaf.view instanceof MarkdownView) leaf.view.previewMode.rerender(true);
+    }
+    for (const block of this.liveBlocks) void block.refresh();
   }
 
   async loadSettings() {
@@ -158,6 +292,7 @@ export default class SectionNumberingPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+    this.redraw();
   }
 
   /**
@@ -244,6 +379,80 @@ export default class SectionNumberingPlugin extends Plugin {
   }
 }
 
+/**
+ * One live table of contents, drawn where its fenced block is. It draws
+ * again when the note's headings change, which the metadata cache reports
+ * with the note's new text, and when the settings change.
+ */
+class LiveContents extends MarkdownRenderChild {
+  constructor(
+    private plugin: SectionNumberingPlugin,
+    containerEl: HTMLElement,
+    private source: string,
+    readonly sourcePath: string,
+  ) {
+    super(containerEl);
+  }
+
+  onload(): void {
+    this.plugin.addLiveBlock(this);
+    this.containerEl.addClass('section-numbering-contents');
+    this.registerDomEvent(this.containerEl, 'click', (event) => {
+      const link = (event.target as HTMLElement).closest('a.internal-link');
+      if (!(link instanceof HTMLElement)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const href = link.dataset.href;
+      if (href) void this.plugin.app.workspace.openLinkText(href, this.sourcePath);
+    });
+    void this.refresh();
+  }
+
+  onunload(): void {
+    this.plugin.removeLiveBlock(this);
+  }
+
+  /** Draws from the note as the editor has it, or as it is on disk. */
+  async refresh(): Promise<void> {
+    const view = this.plugin.app.workspace
+      .getLeavesOfType('markdown')
+      .map((leaf) => leaf.view)
+      .find((v): v is MarkdownView => v instanceof MarkdownView && v.file?.path === this.sourcePath);
+    if (view) {
+      this.draw(view.editor.getValue());
+      return;
+    }
+    const file = this.plugin.app.vault.getAbstractFileByPath(this.sourcePath);
+    if (file instanceof TFile) this.draw(await this.plugin.app.vault.cachedRead(file));
+  }
+
+  draw(text: string): void {
+    const el = this.containerEl;
+    el.empty();
+    const entries = this.plugin.liveEntries(text, this.source);
+    if (entries.length === 0) {
+      el.createDiv({ cls: 'section-numbering-contents-empty', text: 'No headings to list yet.' });
+      return;
+    }
+    // Nested lists, one level of nesting per heading level below the first.
+    const root = el.createEl('ul');
+    const stack: HTMLElement[] = [root];
+    let lastItem: HTMLElement | null = null;
+    for (const entry of entries) {
+      while (stack.length - 1 < entry.depth) {
+        const parent: HTMLElement = lastItem ?? stack[stack.length - 1].createEl('li');
+        const list = parent.createEl('ul');
+        stack.push(list);
+        lastItem = null;
+      }
+      while (stack.length - 1 > entry.depth) stack.pop();
+      lastItem = stack[stack.length - 1].createEl('li');
+      const href = headingLink(entry.heading);
+      lastItem.createEl('a', { cls: 'internal-link', text: entry.label, href, attr: { 'data-href': href } });
+    }
+  }
+}
+
 function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
@@ -282,6 +491,14 @@ interface SettingRow {
  * table, so the declarative one and the pre-1.13 fallback cannot drift.
  */
 const SETTINGS: SettingRow[] = [
+  {
+    key: 'showNumbers',
+    name: 'Show numbers without changing notes',
+    desc:
+      'Draw the numbers in front of headings, in the editor and in reading view, without writing them into the note. ' +
+      'Links keep working with nothing to rewrite. A note whose headings already have written numbers, ' +
+      'or whose properties say "number headings: off", is left as it is.',
+  },
   {
     key: 'firstLevel',
     name: 'First numbered level',

@@ -1,0 +1,14 @@
+/* Numbers shown in front of headings, never part of the note's text. */
+.section-numbering-number {
+  color: var(--section-numbering-color, inherit);
+  user-select: none;
+}
+
+.section-numbering-contents ul {
+  margin-block: 0;
+}
+
+.section-numbering-contents-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}

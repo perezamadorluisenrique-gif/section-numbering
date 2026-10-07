@@ -6,7 +6,8 @@
 
 Outline numbers for your headings — `1.`, `1.1.`, `1.2.` — that stay right
 when you move sections around, **without breaking the links that point at
-them**.
+them**. Show the numbers on screen and leave your notes untouched, or write
+them into the text; add a table of contents that keeps itself up to date.
 
 ```markdown
 ## 1. Introduction
@@ -17,6 +18,45 @@ them**.
 ```
 
 ![Running Number headings in this note: the headings get numbers, and links to them in the same note and in another note are rewritten](https://raw.githubusercontent.com/perezamadorluisenrique-gif/section-numbering/main/docs/numbering.gif)
+
+## Show numbers without changing the note
+
+Turn on **Show numbers without changing notes** in the settings, or run *Show
+or hide heading numbers*, and every note gets its numbers drawn in front of
+its headings, in the editor and in reading view. The text stays `## Method`;
+nothing is written, so there is nothing to renumber when you move a section,
+and no link can break. Add or move a heading and the numbers follow as you
+type.
+
+![Live Preview with shown numbers: the headings read 1. Guide, 1.1. Introduction, 1.2. Method and so on, and a live table of contents above them lists the same numbers](https://raw.githubusercontent.com/perezamadorluisenrique-gif/section-numbering/main/docs/shown-numbers.png)
+
+The numbers follow the same settings as written ones, and a note's `number
+headings` property, `^skipped` headings included. A note whose headings already
+have written numbers is left as it is, so a number never shows twice, and
+`number headings: off` turns them off for a note.
+
+Shown numbers are not part of the text, so they are not in exports, copies or
+other apps. *Copy this note with heading numbers* puts the note on the
+clipboard with the numbers written in, for pasting elsewhere; the note itself
+is not changed. To keep the numbers in the file, use *Number headings in this
+note* instead.
+
+## Live table of contents
+
+*Insert live table of contents* adds this block:
+
+````markdown
+```section-contents
+```
+````
+
+It is drawn as a list of links to the note's headings, numbered like the
+headings, and drawn again whenever they change: nothing to update by hand,
+and nothing written into the note but the block. Click an entry to go to the
+heading. Two options can go inside the block, one per line:
+
+- `depth: 2` lists only the first two numbered levels;
+- `numbers: off` lists the headings without shown numbers.
 
 ## Why links matter here
 
@@ -47,6 +87,9 @@ Block references (`#^id`) are not headings and are never touched.
 | Number headings in this note | Numbers every heading in range, or renumbers it if it is already numbered. |
 | Remove heading numbers in this note | Takes the numbers off again. |
 | Insert or update table of contents | Inserts a list of links to the headings at the cursor, or brings the existing one up to date. |
+| Show or hide heading numbers (without changing notes) | Turns the shown numbers on or off. |
+| Insert live table of contents | Adds a table of contents block that keeps itself up to date. |
+| Copy this note with heading numbers | Copies the note with the numbers written in, leaving the note as it is. |
 | Save numbering settings to this note's properties | Writes the plugin's current settings into the note's `number headings` property, so the note keeps numbering this way whatever the settings become. |
 
 None has a hotkey by default; assign one in **Settings → Hotkeys**.
@@ -78,6 +121,7 @@ line ends with `^toc`: rename the label, or make it a heading such as
 
 | Setting | Default | |
 |---|---|---|
+| Show numbers without changing notes | Off | Draws the numbers in front of headings without writing them. See [Show numbers without changing the note](#show-numbers-without-changing-the-note). |
 | First numbered level | Automatic | The level that gets a single number. Automatic uses the shallowest heading in each note. Shallower headings stay unnumbered and restart the count, so with level 2 each `#` chapter numbers its sections from 1. |
 | Last numbered level | Heading 6 | Deeper headings are left as they are. |
 | Top-level numbers | 1, 2, 3 | Or A, B, C, or I, II, III. |
@@ -181,8 +225,9 @@ Headings writes it. `_.1.1` starts numbering one level lower.
 says where the table of contents goes, as Number Headings reads it, so an
 existing one is kept up to date. `skip ^id` is honoured. `auto` is accepted and ignored.
 
-Automatic numbering as you type is not included: rewriting links in other notes
-on every keystroke is not something a plugin should do behind your back.
+Writing numbers into the text as you type is not included: rewriting links in
+other notes on every keystroke is not something a plugin should do behind your
+back. Shown numbers give you numbers that follow every edit without that.
 
 ## Installing
 
