@@ -4,6 +4,12 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.5.0
+
+- **Show numbers without changing the note.** A new setting, and the command *Show or hide heading numbers*, draw the outline numbers in front of your headings in the editor and in reading view without writing them into the note. They follow your edits as you type, use the same settings and `number headings` property as written numbers, and leave notes that already have written numbers alone. Nothing is rewritten, so no link can break.
+- **Live table of contents.** *Insert live table of contents* adds a `section-contents` block that lists the note's headings as links, numbered like the headings, and updates itself whenever they change. Options: `depth: N` and `numbers: off`.
+- **Copy this note with heading numbers.** Puts the note on the clipboard with the numbers written in, for pasting or exporting elsewhere, without changing it.
+
 ## 0.4.0
 
 - **Skip individual headings.** A heading whose line ends with `^skipped` (the anchor Number Headings uses; change it in the settings or with `skip ^name` in a note's `number headings` property) is not numbered and takes no number, and a number it already had is removed. Its subheadings are still numbered, as in Number Headings. The anchor is never touched and links to the heading are left alone.

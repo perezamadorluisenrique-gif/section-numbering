@@ -269,40 +269,101 @@ export function planNumbering(text: string, settings: NumberingSettings): Plan {
   const headings = parseHeadings(text);
   const first = firstLevelOf(headings, settings);
   const prefixes = existingPrefixes(headings, settings, first);
-  let counters: number[] = [];
+  const numbers = outlineNumbers(headings, settings, first, prefixes);
 
   headings.forEach((heading, index) => {
-    if (heading.level < first) {
-      counters = [];
-      return;
-    }
-    if (heading.level > settings.maxLevel) return;
-
     const existing = prefixes[index];
-    if (heading.text.slice(existing).trim() === '') return;
-    if (isSkipped(heading.text, settings.skipAnchor)) {
-      if (existing > 0) {
+    const prefix = numbers[index];
+    if (prefix === undefined) {
+      // A skipped heading loses a number it was given earlier.
+      if (existing > 0 && isSkipped(heading.text, settings.skipAnchor) && inNumberedRange(heading, settings, first)) {
+        if (heading.text.slice(existing).trim() === '') return;
         plan.edits.push({ from: heading.from, to: heading.from + existing, insert: '' });
         recordRename(plan, heading, heading.text.slice(existing));
       }
       return;
     }
-
-    const depth = heading.level - first;
-    counters = counters.slice(0, depth + 1);
-    while (counters.length <= depth) counters.push(counters.length === 0 ? (settings.startAt ?? 1) - 1 : 0);
-    counters[depth]++;
-
-    const prefix =
-      counters.map((n, i) => formatNumber(n, i === 0 ? settings.topStyle : settings.otherStyle)).join('.') +
-      settings.separator +
-      ' ';
     if (heading.text.slice(0, existing) !== prefix) {
       plan.edits.push({ from: heading.from, to: heading.from + existing, insert: prefix });
     }
     recordRename(plan, heading, prefix + heading.text.slice(existing));
   });
   return plan;
+}
+
+function inNumberedRange(heading: Heading, settings: NumberingSettings, first: number): boolean {
+  return heading.level >= first && heading.level <= settings.maxLevel;
+}
+
+/**
+ * The number each heading should carry, with its separator and the space
+ * after it (`1.2. `), indexed like `headings`; undefined for a heading that
+ * takes none: above or below the numbered range, empty, or skipped.
+ *
+ * A heading above the first level starts the count again, so with the first
+ * level set to 2 each `#` chapter numbers its own sections from 1. Headings
+ * with no text are skipped. A heading marked with the skip anchor
+ * (`## Preface ^skipped`) is ignored altogether, as in Number Headings: its
+ * subheadings carry on from the nearest numbered heading above.
+ */
+function outlineNumbers(
+  headings: Heading[],
+  settings: NumberingSettings,
+  first: number,
+  prefixes: number[],
+): Array<string | undefined> {
+  const out: Array<string | undefined> = [];
+  let counters: number[] = [];
+  headings.forEach((heading, index) => {
+    out.push(undefined);
+    if (heading.level < first) {
+      counters = [];
+      return;
+    }
+    if (heading.level > settings.maxLevel) return;
+    if (heading.text.slice(prefixes[index]).trim() === '') return;
+    if (isSkipped(heading.text, settings.skipAnchor)) return;
+
+    const depth = heading.level - first;
+    counters = counters.slice(0, depth + 1);
+    while (counters.length <= depth) counters.push(counters.length === 0 ? (settings.startAt ?? 1) - 1 : 0);
+    counters[depth]++;
+    out[index] =
+      counters.map((n, i) => formatNumber(n, i === 0 ? settings.topStyle : settings.otherStyle)).join('.') +
+      settings.separator +
+      ' ';
+  });
+  return out;
+}
+
+/** A heading and the number shown in front of it, for display only. */
+export interface ShownNumber {
+  heading: Heading;
+  /** The number with its separator and trailing space, as `1.2. `. */
+  number: string;
+}
+
+/**
+ * The numbers to draw in front of the headings of a note whose text carries
+ * none: the same numbers *Number headings* would write, worked out the same
+ * way, but for showing only. A note where any heading in range already has a
+ * written number gets none drawn, so a number never shows twice.
+ */
+export function shownNumbers(text: string, settings: NumberingSettings): ShownNumber[] {
+  const headings = parseHeadings(text);
+  const first = firstLevelOf(headings, settings);
+  const prefixes = existingPrefixes(headings, settings, first);
+  const written = headings.some(
+    (h, i) => prefixes[i] > 0 && inNumberedRange(h, settings, first) && !isSkipped(h.text, settings.skipAnchor),
+  );
+  if (written) return [];
+  const numbers = outlineNumbers(headings, settings, first, prefixes);
+  const out: ShownNumber[] = [];
+  headings.forEach((heading, i) => {
+    const number = numbers[i];
+    if (number !== undefined) out.push({ heading, number });
+  });
+  return out;
 }
 
 /** Takes the numbers off every heading in the numbered range. */
