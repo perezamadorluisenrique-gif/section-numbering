@@ -4,12 +4,12 @@ import type { MarkdownPostProcessorContext, SettingDefinitionItem } from 'obsidi
 import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
 
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
-import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
+import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, mergeNoteSettings, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
 import { LIVE_CONTENTS_LANGUAGE, headingLink, liveContentsEntries, newLiveBlock, parseLiveOptions } from './src/live.ts';
 import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
-import { DEFAULT_NUMBERING, planNumbering, planRemoval, shownNumbers } from './src/numbering.ts';
+import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, planRemoval, rememberTemplates, shownNumbers } from './src/numbering.ts';
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
 
 interface SectionNumberingSettings extends NumberingSettings {
@@ -23,6 +23,8 @@ interface SectionNumberingSettings extends NumberingSettings {
 
 const DEFAULT_SETTINGS: SectionNumberingSettings = {
   ...DEFAULT_NUMBERING,
+  topTemplate: DEFAULT_TEMPLATE,
+  otherTemplate: DEFAULT_TEMPLATE,
   updateLinks: true,
   readFrontMatter: true,
   showNumbers: false,
@@ -187,6 +189,8 @@ export default class SectionNumberingPlugin extends Plugin {
       separator: s.separator,
       startAt: s.startAt,
       skipAnchor: s.skipAnchor,
+      topTemplate: s.topTemplate,
+      otherTemplate: s.otherTemplate,
     };
     try {
       await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
@@ -224,7 +228,7 @@ export default class SectionNumberingPlugin extends Plugin {
       if (!quiet) new Notice('This note has "number headings: off" in its properties, so its headings were left alone.');
       return null;
     }
-    return { ...this.settings, ...own.settings };
+    return mergeNoteSettings(this.settings, own.settings);
   }
 
   /** The numbers to draw for a note's text: none unless showing is on and the note allows it. */
@@ -340,6 +344,20 @@ export default class SectionNumberingPlugin extends Plugin {
       if (links > 0) message += ` Updated ${count(links, 'link')} in ${count(notes, 'other note')}.`;
     }
     new Notice(message);
+    await this.rememberTemplates(settings);
+  }
+
+  /**
+   * Keeps the templates that were just written into a note, so that after
+   * the template setting changes the old text is still recognised and
+   * replaced rather than left in front of the new.
+   */
+  private async rememberTemplates(applied: NumberingSettings): Promise<void> {
+    const before = this.settings.knownTemplates ?? [];
+    const next = rememberTemplates(before, applied.topTemplate, applied.otherTemplate);
+    if (next.join('\n') === before.join('\n')) return;
+    this.settings.knownTemplates = next;
+    await this.saveData(this.settings);
   }
 
   private resolves(path: string, sourcePath: string, target: TFile): boolean {
@@ -460,7 +478,10 @@ function count(n: number, noun: string): string {
 const STYLE_OPTIONS: Record<NumberStyle, string> = {
   '1': '1, 2, 3',
   A: 'A, B, C',
+  a: 'a, b, c',
   I: 'I, II, III',
+  i: 'i, ii, iii',
+  一: '一, 二, 三 (Chinese)',
 };
 
 const SEPARATOR_OPTIONS: Record<Separator, string> = {
@@ -483,7 +504,8 @@ interface SettingRow {
   desc: string;
   /** A dropdown's options, value to label; with no options this is a toggle, or a text box when `text` is set. */
   options?: Record<string, string>;
-  text?: boolean;
+  /** A text box, with the text it shows when empty and the value it starts from. */
+  text?: { placeholder: string; defaultValue: string };
 }
 
 /**
@@ -534,7 +556,22 @@ const SETTINGS: SettingRow[] = [
     desc:
       'A heading whose line ends with this block id, such as "## Preface ^skipped", is not numbered and takes no number. ' +
       'It stays out of the table of contents. Leave empty to turn skipping off.',
-    text: true,
+    text: { placeholder: '^skipped', defaultValue: '^skipped' },
+  },
+  {
+    key: 'topTemplate',
+    name: 'Top-level template',
+    desc:
+      'Text around the number of top-level headings, with {n} for the number: "Chapter {n}." gives "Chapter 1. Intro". ' +
+      'Text after {n} replaces the separator; with none ("Chapter {n}") the separator still follows. ' +
+      'Numbering again replaces text written by an earlier template.',
+    text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
+  },
+  {
+    key: 'otherTemplate',
+    name: 'Lower-level template',
+    desc: 'The same for every heading below the top level, where {n} is the whole number, as in "Section {n}" for "Section 1.2".',
+    text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
   },
   {
     key: 'readFrontMatter',
@@ -579,7 +616,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
       name: row.name,
       desc: row.desc,
       control: row.text
-        ? { type: 'text' as const, key: row.key, placeholder: '^skipped', defaultValue: '^skipped' }
+        ? { type: 'text' as const, key: row.key, placeholder: row.text.placeholder, defaultValue: row.text.defaultValue }
         : row.options
         ? { type: 'dropdown' as const, key: row.key, options: row.options, defaultValue: String(DEFAULT_SETTINGS[row.key]) }
         : { type: 'toggle' as const, key: row.key, defaultValue: DEFAULT_SETTINGS[row.key] as boolean },
@@ -596,6 +633,12 @@ class SectionNumberingSettingTab extends PluginSettingTab {
       const id = (typeof value === 'string' ? value : '').trim().replace(/^\^/, '');
       if (id !== '' && !/^[\w-]+$/.test(id)) return;
       value = id;
+    }
+    if (key === 'topTemplate' || key === 'otherTemplate') {
+      // Empty is the plain number; text with no single {n} is not a template yet, so it is not taken.
+      const text = (typeof value === 'string' ? value : '').trim();
+      value = text === '' ? DEFAULT_TEMPLATE : text;
+      if (!isValidTemplate(value as string)) return;
     }
     Object.assign(this.plugin.settings, { [key]: toStored(key as SettingKey, value) });
     await this.plugin.saveSettings();
@@ -620,7 +663,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
       } else if (row.text) {
         setting.addText((text) => {
           text
-            .setPlaceholder('^skipped')
+            .setPlaceholder(row.text?.placeholder ?? '')
             .setValue(String(current))
             .onChange((value) => this.setControlValue(row.key, value));
         });

@@ -5,6 +5,9 @@ import { noteSettings } from '../src/frontmatter.ts';
 import { applyEdits } from '../src/markdown.ts';
 import { DEFAULT_NUMBERING, planNumbering } from '../src/numbering.ts';
 
+// What a note's own settings always start from: no separator, no text around the number.
+const PLAIN = { separator: '', topTemplate: '{n}', otherTemplate: '{n}' } as const;
+
 const note = (value: string, body = '# A\n') => `---\ntags: x\nnumber headings: ${value}\n---\n${body}`;
 
 test('a note without the key has no settings of its own', () => {
@@ -22,7 +25,7 @@ test('off leaves the note alone', () => {
 test('reads first-level, max, start-at and the style', () => {
   assert.deepEqual(noteSettings(note('auto, first-level 2, max 4, start-at 3, A.1')), {
     off: false,
-    settings: { separator: '', firstLevel: 2, maxLevel: 4, startAt: 3, topStyle: 'A', otherStyle: '1' },
+    settings: { ...PLAIN, firstLevel: 2, maxLevel: 4, startAt: 3, topStyle: 'A', otherStyle: '1' },
   });
 });
 
@@ -41,7 +44,7 @@ test('a separator after the style is kept', () => {
 
 test('_.1.1 starts numbering one level lower', () => {
   const s = noteSettings(note('_.1.1'));
-  assert.deepEqual(s, { off: false, settings: { separator: '', firstLevel: 2, topStyle: '1', otherStyle: '1' } });
+  assert.deepEqual(s, { off: false, settings: { ...PLAIN, firstLevel: 2, topStyle: '1', otherStyle: '1' } });
   const t = noteSettings(note('first-level 2, _.1.1'));
   assert.ok(t && !t.off && t.settings.firstLevel === 3);
 });
@@ -49,7 +52,7 @@ test('_.1.1 starts numbering one level lower', () => {
 test('contents, quotes and unknown parts are ignored; skip is read', () => {
   assert.deepEqual(noteSettings(note('"auto, contents ^toc, skip ^skipped, max 3"')), {
     off: false,
-    settings: { separator: '', maxLevel: 3, skipAnchor: 'skipped' },
+    settings: { ...PLAIN, maxLevel: 3, skipAnchor: 'skipped' },
   });
 });
 

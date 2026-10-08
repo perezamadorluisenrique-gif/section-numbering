@@ -197,13 +197,16 @@ const roundTrip = (settings: NumberingSettings, contents?: string) => {
 
 test('saved settings read back exactly', () => {
   const seps = ['.', ')', ':', ' —', ' -', ''] as const;
-  const styles = ['1', 'A', 'I'] as const;
+  const styles = ['1', 'A', 'I', 'a', 'i', '一'] as const;
   for (const firstLevel of ['auto', 1, 2, 6] as const) {
     for (const separator of seps) {
       for (const topStyle of styles) {
         for (const otherStyle of styles) {
           for (const skipAnchor of ['skipped', 'no-num_1', '']) {
-            const s: NumberingSettings = { firstLevel, maxLevel: 4, topStyle, otherStyle, separator, startAt: 0, skipAnchor };
+            const s: NumberingSettings = {
+              firstLevel, maxLevel: 4, topStyle, otherStyle, separator, startAt: 0, skipAnchor,
+              topTemplate: '{n}', otherTemplate: '{n}',
+            };
             assert.deepEqual(roundTrip(s), s);
           }
         }
