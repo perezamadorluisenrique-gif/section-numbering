@@ -11,11 +11,17 @@
  * - `off`: leave this note alone;
  * - `first-level N` and `max N`: the first and last numbered heading levels;
  * - `start-at N`: the first top-level number;
- * - a style such as `1.1`, `A.1` or `I.1`: how the top level and the levels
+ * - a style such as `1.1`, `A.1` or `I.1` (also `a`, `i` and `一` for
+ *   lowercase letters, lowercase Roman and Chinese numerals, our own): how the top level and the levels
  *   below it are written, optionally followed by a separator (`1.1.`,
  *   `1.1)`, `1.1:`, `1.1 —`, `1.1 -`). A leading `_.` (`_.1.1`) leaves the
  *   top level unnumbered, which here means numbering starts one level lower.
  *
+ * - `template-level-1 \"Chapter {n}.\"` and `template-level-other \"{n}\"`: the text
+ *   around the number of the top level and of the levels below it (our own
+ *   addition; Number Headings does not know it). The text may hold commas
+ *   when it is in double quotes. A note with the key and no template part
+ *   gets plain `{n}` for both, whatever the plugin's own setting is.
  * - `skip ^id`: headings whose line ends with that block id are not numbered
  *   (`skip none` turns skipping off for the note).
  *
@@ -32,6 +38,7 @@
  */
 
 import { scanLines } from './markdown.ts';
+import { DEFAULT_TEMPLATE, isValidTemplate, rememberTemplates } from './numbering.ts';
 import type { NumberStyle, NumberingSettings, Separator } from './numbering.ts';
 
 export const FRONT_MATTER_KEY = 'number headings';
@@ -39,7 +46,8 @@ export const FRONT_MATTER_KEY = 'number headings';
 export type NoteSettings = { off: true } | { off: false; settings: Partial<NumberingSettings> };
 
 const KEY_LINE = /^number[ _-]headings[ \t]*:[ \t]*(.*)$/i;
-const STYLE = /^(_\.)?([1AI])((?:\.[1AI])*)[ \t]*(\.|\)|:|—|-)?$/;
+const STYLE = /^(_\.)?([1AIai一])((?:\.[1AIai一])*)[ \t]*(\.|\)|:|—|-)?$/;
+const TEMPLATE_PART = /^template-level-(1|other)[ \t]+(.+)$/i;
 const SEPARATOR: Record<string, Separator> = { '.': '.', ')': ')', ':': ':', '—': ' —', '-': ' -' };
 
 type Level = 1 | 2 | 3 | 4 | 5 | 6;
@@ -56,7 +64,15 @@ export function frontMatterValue(text: string): string | null {
     const match = KEY_LINE.exec(line.text);
     if (match) value = match[1];
   }
-  return value === null ? null : value.trim().replace(/^(["'])(.*)\1$/, '$2');
+  return value === null ? null : unquote(value.trim());
+}
+
+/** A YAML quoted scalar's text: `\"` and `\\` inside double quotes, `''` inside single quotes. */
+function unquote(value: string): string {
+  const double = /^"(.*)"$/.exec(value);
+  if (double) return double[1].replace(/\\(["\\])/g, '$1');
+  const single = /^'(.*)'$/.exec(value);
+  return single ? single[1].replace(/''/g, "'") : value;
 }
 
 /**
@@ -94,20 +110,66 @@ export function settingsToValue(settings: NumberingSettings, contents?: string |
     ...(contents ? [`contents ^${contents}`] : []),
     `skip ${settings.skipAnchor ? `^${settings.skipAnchor}` : 'none'}`,
     `start-at ${settings.startAt ?? 1}`,
+    ...templateParts(settings),
     `${settings.topStyle}.${settings.otherStyle}${STYLE_SEPARATOR[settings.separator]}`,
   ];
   return parts.join(', ');
+}
+
+/** `template-level-…` parts, written only when a template puts text around the number. */
+function templateParts(settings: NumberingSettings): string[] {
+  const top = settings.topTemplate ?? DEFAULT_TEMPLATE;
+  const other = settings.otherTemplate ?? DEFAULT_TEMPLATE;
+  if (top.trim() === DEFAULT_TEMPLATE && other.trim() === DEFAULT_TEMPLATE) return [];
+  return [`template-level-1 "${top.trim()}"`, `template-level-other "${other.trim()}"`];
+}
+
+/** Splits at the commas that are not inside double quotes. */
+function splitParts(value: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quoted = false;
+  for (const ch of value) {
+    if (ch === '"') quoted = !quoted;
+    if (ch === ',' && !quoted) {
+      parts.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+/**
+ * The plugin's settings with a note's own over them. Templates the plugin
+ * has configured stay recognised, so a note numbered under the global
+ * template is not numbered a second time under its own.
+ */
+export function mergeNoteSettings(base: NumberingSettings, own: Partial<NumberingSettings>): NumberingSettings {
+  return {
+    ...base,
+    ...own,
+    knownTemplates: rememberTemplates(base.knownTemplates, base.topTemplate, base.otherTemplate),
+  };
 }
 
 /** The note's own settings, or null when its front matter has no `number headings` key. */
 export function noteSettings(text: string): NoteSettings | null {
   const value = frontMatterValue(text);
   if (value === null) return null;
-  const settings: Partial<NumberingSettings> = { separator: '' };
+  const settings: Partial<NumberingSettings> = { separator: '', topTemplate: DEFAULT_TEMPLATE, otherTemplate: DEFAULT_TEMPLATE };
   let skipTop = false;
 
-  for (const raw of value.split(',')) {
+  for (const raw of splitParts(value)) {
     const part = raw.trim();
+    const template = TEMPLATE_PART.exec(part);
+    if (template) {
+      const text = template[2].trim().replace(/^"(.*)"$/, '$1').trim();
+      if (isValidTemplate(text)) settings[template[1] === '1' ? 'topTemplate' : 'otherTemplate'] = text;
+      continue;
+    }
     const [word, arg] = part.split(/\s+/, 2);
     const n = Number(arg);
     switch (word.toLowerCase()) {

@@ -6,8 +6,17 @@
 import { scanLines } from './markdown.ts';
 import type { Edit } from './markdown.ts';
 
-/** Arabic `1`, capital letters `A`, or capital Roman numerals `I`. */
-export type NumberStyle = '1' | 'A' | 'I';
+/**
+ * Arabic `1`, capital letters `A`, capital Roman numerals `I`, their
+ * lowercase forms `a` and `i`, or Chinese numerals `一` (一, 二, 三 ... 十,
+ * 十一, 二十一, 一百).
+ */
+export type NumberStyle = '1' | 'A' | 'I' | 'a' | 'i' | '一';
+
+export const NUMBER_STYLES: readonly NumberStyle[] = ['1', 'A', 'I', 'a', 'i', '一'];
+
+/** The template that adds nothing around the number: the plugin's own behaviour before templates. */
+export const DEFAULT_TEMPLATE = '{n}';
 
 /** What goes between the number and the heading text. */
 export const SEPARATORS = ['.', ')', ':', ' —', ' -', ''] as const;
@@ -29,6 +38,21 @@ export interface NumberingSettings {
    * missing turns skipping off.
    */
   skipAnchor?: string;
+  /**
+   * The text around the number of a top-level heading, with `{n}` standing
+   * for the number: `Chapter {n}.` gives `Chapter 1. Intro`. Text after
+   * `{n}` replaces the separator; with none (`Chapter {n}`) the separator
+   * still follows the number. Missing or invalid means `{n}`.
+   */
+  topTemplate?: string;
+  /** The same for every heading below the top level. */
+  otherTemplate?: string;
+  /**
+   * Templates used earlier, or by other notes, that are still recognised in
+   * front of a heading so changing a template replaces the old text instead
+   * of stacking a new one on it.
+   */
+  knownTemplates?: string[];
 }
 
 export const DEFAULT_NUMBERING: NumberingSettings = {
@@ -38,6 +62,8 @@ export const DEFAULT_NUMBERING: NumberingSettings = {
   otherStyle: '1',
   separator: '.',
   skipAnchor: 'skipped',
+  topTemplate: DEFAULT_TEMPLATE,
+  otherTemplate: DEFAULT_TEMPLATE,
 };
 
 /**
@@ -89,6 +115,9 @@ export function formatNumber(n: number, style: NumberStyle): string {
   // A level skipped over (a ### straight under a #) counts as zero, the way
   // Pandoc numbers it, and zero has no letter or numeral.
   if (n === 0) return '0';
+  if (style === 'a') return formatNumber(n, 'A').toLowerCase();
+  if (style === 'i') return formatNumber(n, 'I').toLowerCase();
+  if (style === '一') return chineseNumeral(n);
   if (style === 'A') {
     let out = '';
     for (let rest = n; rest > 0; rest = Math.floor((rest - 1) / 26)) {
@@ -114,9 +143,140 @@ export function formatNumber(n: number, style: NumberStyle): string {
   return String(n);
 }
 
+const CHINESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const CHINESE_UNITS = ['', '十', '百', '千'];
+
+/**
+ * 1 to 9999 as Chinese numerals the way a numbered list writes them: 十,
+ * 十一, 二十, 二十一, 一百, 一百零一, 一百一十, 一千零一十. Ten to nineteen
+ * lose the leading 一 only at the front (十一, but 一百一十一). Past 9999
+ * the digits are kept.
+ */
+export function chineseNumeral(n: number): string {
+  if (n < 1 || n > 9999) return String(n);
+  const digits = String(n).split('').map(Number);
+  let out = '';
+  let zero = false;
+  digits.forEach((d, i) => {
+    const place = digits.length - 1 - i;
+    if (d === 0) {
+      if (out !== '') zero = true;
+      return;
+    }
+    if (zero) out += CHINESE_DIGITS[0];
+    zero = false;
+    out += d === 1 && place === 1 && out === '' ? CHINESE_UNITS[1] : CHINESE_DIGITS[d] + CHINESE_UNITS[place];
+  });
+  return out;
+}
+
+/** The characters a Chinese numeral is written with, as this plugin writes and reads it. */
+const CHINESE_TOKEN = '[零〇一二三四五六七八九十百千]+';
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+export interface Template {
+  /** Literal text before the number. */
+  prefix: string;
+  /** Literal text after the number; empty means the separator follows. */
+  suffix: string;
+}
+
+/** Whether a template has exactly one `{n}`. */
+export function isValidTemplate(template: string): boolean {
+  const at = template.indexOf('{n}');
+  return at >= 0 && template.indexOf('{n}', at + 3) < 0;
+}
+
+/**
+ * Splits a template at its `{n}`. Surrounding whitespace is dropped, so the
+ * space after the number is always the one the plugin adds. A template that
+ * is missing or has no (or more than one) `{n}` is the plain `{n}`.
+ */
+export function parseTemplate(template: string | undefined): Template {
+  const t = (template ?? DEFAULT_TEMPLATE).trim();
+  if (!isValidTemplate(t)) return { prefix: '', suffix: '' };
+  const at = t.indexOf('{n}');
+  return { prefix: t.slice(0, at), suffix: t.slice(at + 3) };
+}
+
+/** The template for a heading `depth` levels below the first numbered level. */
+export function templateFor(settings: NumberingSettings, depth: number): Template {
+  return parseTemplate(depth === 0 ? settings.topTemplate : settings.otherTemplate);
+}
+
+/** Adds templates to a recognised list: only those that put text around the number, once each, newest last. */
+export function rememberTemplates(known: string[] | undefined, ...templates: Array<string | undefined>): string[] {
+  const out = [...(known ?? [])];
+  for (const raw of templates) {
+    if (raw === undefined) continue;
+    const t = raw.trim();
+    const { prefix, suffix } = parseTemplate(t);
+    if (prefix === '' && suffix === '') continue;
+    const at = out.indexOf(t);
+    if (at >= 0) out.splice(at, 1);
+    out.push(t);
+  }
+  return out.slice(-30);
+}
+
+/** `1.2` as the plugin writes it: the counters in their styles, joined by dots. */
+function dottedNumber(counters: number[], settings: NumberingSettings): string {
+  return counters.map((n, i) => formatNumber(n, i === 0 ? settings.topStyle : settings.otherStyle)).join('.');
+}
+
+/** A literal template part as a pattern; any run of blanks matches any run of blanks. */
+function literal(text: string): string {
+  return escapeRegExp(text).replace(/[ \t]+/g, '[ \\t]+');
+}
+
+function tokenPattern(styles: NumberStyle[], withChinese: boolean): string {
+  const kinds = ['0', '\\d+'];
+  if (styles.includes('A')) kinds.push('[A-Z]{1,2}');
+  if (styles.includes('a')) kinds.push('[a-z]{1,2}');
+  // The lookahead keeps the Roman pattern from matching nothing at all.
+  if (styles.includes('I')) kinds.push('(?=[MDCLXVI])M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})');
+  if (styles.includes('i')) kinds.push('(?=[mdclxvi])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})');
+  if (withChinese || styles.includes('一')) kinds.push(CHINESE_TOKEN);
+  return `(?:${kinds.join('|')})`;
+}
+
+/** The two halves of the number pattern: a bare number, and a number inside a known template. */
+function prefixSources(settings: NumberingSettings): { bare: string; templated: string | null } {
+  const styles = [settings.topStyle, settings.otherStyle];
+  // Chinese numerals are told apart from words by their characters alone, so
+  // a note numbered with them is still read after the style was changed. The
+  // letters and Roman numerals are only read when configured.
+  const configured = tokenPattern(styles, false);
+  const any = tokenPattern(styles, true);
+  const marked = SEPARATORS.filter((s) => s !== '')
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp)
+    .join('|');
+  const dotted = `${any}(?:\\.${any}){1,5}(?:${marked})?`;
+  const single = settings.separator === '' ? `${configured}(?:${marked})?` : `${any}(?:${marked})`;
+  const bare = `(?:${dotted}|${single})`;
+
+  const seen = new Set<string>();
+  const alternatives: string[] = [];
+  for (const raw of [settings.topTemplate, settings.otherTemplate, ...(settings.knownTemplates ?? [])]) {
+    const { prefix, suffix } = parseTemplate(raw);
+    if (prefix === '' && suffix === '') continue;
+    const key = prefix + '\u0000' + suffix;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    alternatives.push(
+      suffix !== ''
+        ? `${literal(prefix)}${any}(?:\\.${any})*${literal(suffix)}`
+        : `${literal(prefix)}${bare}`,
+    );
+  }
+  return { bare, templated: alternatives.length ? `(?:${alternatives.join('|')})` : null };
+}
+
+const TAIL = '(?:[ \\t]+|$)';
 
 /**
  * Matches a number this plugin could have written, at the start of a
@@ -125,6 +285,9 @@ function escapeRegExp(s: string): string {
  * It accepts any depth and every separator, not only the configured ones,
  * so that a heading moved to another level, or a note numbered before the
  * separator setting changed, is renumbered rather than numbered twice.
+ * It also accepts the number inside any template the plugin knows (the
+ * configured ones and the ones used before), so `Chapter 1. Intro` is one
+ * numbered heading and not `Intro` under a stray `Chapter 1.`.
  *
  * A dotted number such as `1.2` needs no separator, which is how the
  * original Number Headings plugin writes it by default. A lone number with
@@ -133,18 +296,28 @@ function escapeRegExp(s: string): string {
  * why the default separator is `.`.
  */
 export function numberPrefixPattern(settings: NumberingSettings): RegExp {
-  const kinds = ['0', '\\d+'];
-  const styles = [settings.topStyle, settings.otherStyle];
-  if (styles.includes('A')) kinds.push('[A-Z]{1,2}');
-  if (styles.includes('I')) kinds.push('M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})');
-  const token = `(?:${kinds.join('|')})`;
-  const marked = SEPARATORS.filter((s) => s !== '')
-    .sort((a, b) => b.length - a.length)
-    .map(escapeRegExp)
-    .join('|');
-  const dotted = `${token}(?:\\.${token}){1,5}(?:${marked})?`;
-  const single = settings.separator === '' ? `${token}(?:${marked})?` : `${token}(?:${marked})`;
-  return new RegExp(`^(?:${dotted}|${single})(?:[ \\t]+|$)`);
+  const { bare, templated } = prefixSources(settings);
+  return new RegExp(`^(?:${templated ? `${templated}|` : ''}${bare})${TAIL}`);
+}
+
+interface PrefixMatcher {
+  bare: RegExp;
+  templated: RegExp | null;
+}
+
+function prefixMatcher(settings: NumberingSettings): PrefixMatcher {
+  const { bare, templated } = prefixSources(settings);
+  return {
+    bare: new RegExp(`^${bare}${TAIL}`),
+    templated: templated ? new RegExp(`^${templated}${TAIL}`) : null,
+  };
+}
+
+/** The length of an existing number and whether it is a bare one (no template text). */
+function matchPrefix(text: string, matcher: PrefixMatcher): { length: number; bare: boolean } {
+  const bare = existingPrefixLength(text, matcher.bare);
+  const templated = matcher.templated ? existingPrefixLength(text, matcher.templated) : 0;
+  return templated > bare ? { length: templated, bare: false } : { length: bare, bare: true };
 }
 
 /** How many characters of `text` are an existing number and its space. */
@@ -189,22 +362,25 @@ export function firstLevelOf(headings: Heading[], settings: NumberingSettings): 
  * to none the plugin writes such numbers itself, so they always count.
  */
 function existingPrefixes(headings: Heading[], settings: NumberingSettings, first: number): number[] {
-  const pattern = numberPrefixPattern(settings);
+  const matcher = prefixMatcher(settings);
   const inRange = (h: Heading) => h.level >= first && h.level <= settings.maxLevel;
   const skipped = headings.map((h) => isSkipped(h.text, settings.skipAnchor));
-  const lengths = headings.map((h) => (inRange(h) ? existingPrefixLength(h.text, pattern) : 0));
+  const matches = headings.map((h) => (inRange(h) ? matchPrefix(h.text, matcher) : { length: 0, bare: true }));
+  const lengths = matches.map((m) => m.length);
   if (settings.separator === '') return lengths;
 
   // Skipped headings are the unnumbered ones, so they neither break "numbered
   // throughout" nor count as versions. They only lose a number this plugin
   // writes with a separator, never a bare `2.0`.
   const counted = lengths.map((length, i) => (skipped[i] ? 0 : length));
+  // Only a bare number can be a version or a year; text from a template cannot.
+  const bareCounted = counted.map((length, i) => (matches[i].bare ? length : 0));
   const numberedThroughout = headings.every(
     (h, i) => !inRange(h) || skipped[i] || counted[i] > 0 || h.text.trim() === '',
   );
-  const keepAll = numberedThroughout && !looksLikeVersions(headings, counted, first);
+  const keepAll = numberedThroughout && !looksLikeVersions(headings, bareCounted, first);
   return lengths.map((length, i) =>
-    (keepAll && !skipped[i]) || !isUnmarked(headings[i].text.slice(0, length)) ? length : 0,
+    (keepAll && !skipped[i]) || !matches[i].bare || !isUnmarked(headings[i].text.slice(0, length)) ? length : 0,
   );
 }
 
@@ -240,7 +416,7 @@ function compareParts(a: number[], b: number[]): number {
 
 /** A number with no separator after it: its last character is a digit or letter. */
 function isUnmarked(prefix: string): boolean {
-  return /[0-9A-Z]$/.test(prefix.replace(/[ \t]+$/, ''));
+  return /[0-9A-Za-z零〇一二三四五六七八九十百千]$/.test(prefix.replace(/[ \t]+$/, ''));
 }
 
 function recordRename(plan: Plan, heading: Heading, next: string): void {
@@ -328,10 +504,8 @@ function outlineNumbers(
     counters = counters.slice(0, depth + 1);
     while (counters.length <= depth) counters.push(counters.length === 0 ? (settings.startAt ?? 1) - 1 : 0);
     counters[depth]++;
-    out[index] =
-      counters.map((n, i) => formatNumber(n, i === 0 ? settings.topStyle : settings.otherStyle)).join('.') +
-      settings.separator +
-      ' ';
+    const { prefix, suffix } = templateFor(settings, depth);
+    out[index] = prefix + dottedNumber(counters, settings) + (suffix !== '' ? suffix : settings.separator) + ' ';
   });
   return out;
 }

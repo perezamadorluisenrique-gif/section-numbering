@@ -124,12 +124,44 @@ line ends with `^toc`: rename the label, or make it a heading such as
 | Show numbers without changing notes | Off | Draws the numbers in front of headings without writing them. See [Show numbers without changing the note](#show-numbers-without-changing-the-note). |
 | First numbered level | Automatic | The level that gets a single number. Automatic uses the shallowest heading in each note. Shallower headings stay unnumbered and restart the count, so with level 2 each `#` chapter numbers its sections from 1. |
 | Last numbered level | Heading 6 | Deeper headings are left as they are. |
-| Top-level numbers | 1, 2, 3 | Or A, B, C, or I, II, III. |
+| Top-level numbers | 1, 2, 3 | Or A, B, C; a, b, c; I, II, III; i, ii, iii; or Chinese numerals 一, 二, 三 (十, 十一, 二十一, 一百 ...). |
 | Lower-level numbers | 1, 2, 3 | The same choice for every level below. |
 | Separator | `1.2. Heading` | Also `)`, `:`, ` —`, ` -` or none. |
+| Top-level template | `{n}` | Text around the number of top-level headings. See [Text around the number](#text-around-the-number). |
+| Lower-level template | `{n}` | The same for every level below. |
 | Skip anchor | `^skipped` | A heading whose line ends with this block id is left unnumbered. See [Skipping headings](#skipping-headings). Empty turns it off. |
 | Follow Number Headings properties | On | A note's `number headings` property overrides the settings above for that note. See [Coming from Number Headings](#coming-from-number-headings). |
 | Update links in other notes | On | Links within the note are always updated. |
+
+### Text around the number
+
+A template says what is written around the number, with `{n}` standing for it.
+Set **Top-level template** to `Chapter {n}.` and the other levels to `{n}`:
+
+```markdown
+# Chapter 1. Guide
+## 1.1. Intro
+## 1.2. Method
+# Chapter 2. Next
+```
+
+Text after `{n}` takes the place of the separator (`Chapter {n}.`, `第{n}章`,
+`{n} —`); a template that ends in `{n}` (`Chapter {n}`) keeps the separator.
+For lower levels `{n}` is the whole number, so `Section {n}` gives `Section 1.2`.
+With Chinese numerals, `第{n}章` gives `第一章 Guide`.
+
+The plugin reads the text it wrote, so numbering again never stacks a second
+`Chapter 1.` in front of the first, and *Remove heading numbers* takes the
+template text off as well. When you change a template, the next *Number
+headings* replaces the old text, because the plugin remembers the templates it
+has written. Shown numbers, the table of contents, *Copy this note with heading
+numbers* and the links to renumbered headings all use the text with the number.
+A note can set its own in its properties:
+`number headings: template-level-1 "Chapter {n}.", template-level-other "{n}", 1.1`.
+(A note that has the property but no template gets plain numbers.) Headings
+written by hand, such as `## Chapter two`, are left as they are; only text
+that matches a template and a number is replaced. The default template `{n}`
+changes nothing.
 
 ### Skipping headings
 
@@ -224,6 +256,9 @@ Headings writes it. `_.1.1` starts numbering one level lower.
 `number headings: off` leaves the note alone. `contents ^toc` (any block id)
 says where the table of contents goes, as Number Headings reads it, so an
 existing one is kept up to date. `skip ^id` is honoured. `auto` is accepted and ignored.
+The styles also take `a`, `i` and `一` (lowercase letters, lowercase Roman and
+Chinese numerals), and `template-level-1` / `template-level-other` set the
+text around the number; those are additions that Number Headings ignores.
 
 Writing numbers into the text as you type is not included: rewriting links in
 other notes on every keystroke is not something a plugin should do behind your
