@@ -4,6 +4,11 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.6.0
+
+- **Text around the number.** Two new settings, Top-level template and Lower-level template, write text such as `Chapter {n}.` or `第{n}章` around the number (`template-level-1` and `template-level-other` in a note's `number headings` property). Numbering again, removing numbers, the table of contents, shown numbers, copying with numbers and link rewriting all recognise that text, so it is never repeated, and changing a template replaces the old text.
+- **More number styles.** Lowercase letters (`a`), lowercase Roman numerals (`i`) and Chinese numerals (`一`, 二, ... 十一, 二十一, 一百), also as `a`, `i` and `一` in the style of a `number headings` property.
+
 ## 0.5.0
 
 - **Show numbers without changing the note.** A new setting, and the command *Show or hide heading numbers*, draw the outline numbers in front of your headings in the editor and in reading view without writing them into the note. They follow your edits as you type, use the same settings and `number headings` property as written numbers, and leave notes that already have written numbers alone. Nothing is rewritten, so no link can break.
