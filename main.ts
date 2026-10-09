@@ -1,5 +1,5 @@
-import { App, Editor, MarkdownRenderChild, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-import type { MarkdownPostProcessorContext, SettingDefinitionItem } from 'obsidian';
+import { App, Editor, ItemView, MarkdownRenderChild, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import type { MarkdownPostProcessorContext, SettingDefinitionItem, View } from 'obsidian';
 
 import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
 
@@ -11,6 +11,8 @@ import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
 import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, planRemoval, rememberTemplates, shownNumbers } from './src/numbering.ts';
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
+import { outlineLabels } from './src/outline.ts';
+import type { OutlineHeading } from './src/outline.ts';
 
 interface SectionNumberingSettings extends NumberingSettings {
   /** Rewrite links in other notes that point at a renumbered heading. */
@@ -19,6 +21,8 @@ interface SectionNumberingSettings extends NumberingSettings {
   readFrontMatter: boolean;
   /** Draw the numbers in front of headings that have none, without changing the note. */
   showNumbers: boolean;
+  /** Also draw the shown numbers in the core Outline pane. */
+  showInOutline: boolean;
 }
 
 const DEFAULT_SETTINGS: SectionNumberingSettings = {
@@ -28,6 +32,7 @@ const DEFAULT_SETTINGS: SectionNumberingSettings = {
   updateLinks: true,
   readFrontMatter: true,
   showNumbers: false,
+  showInOutline: true,
 };
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
@@ -39,6 +44,7 @@ export default class SectionNumberingPlugin extends Plugin {
   private liveBlocks = new Set<LiveContents>();
   /** The last note text whose shown numbers were worked out, for reading view. */
   private shownCache: { text: string; byLine: Map<number, string> } | null = null;
+  private outline = new OutlineNumbers(this);
 
   async onload() {
     await this.loadSettings();
@@ -58,6 +64,14 @@ export default class SectionNumberingPlugin extends Plugin {
         for (const block of this.liveBlocks) if (block.sourcePath === file.path) block.draw(data);
       }),
     );
+
+    // The Outline pane draws again when the layout, the open note or its
+    // headings change; each of these refreshes its numbers soon after.
+    this.app.workspace.onLayoutReady(() => this.outline.sync());
+    this.registerEvent(this.app.workspace.on('layout-change', () => this.outline.sync()));
+    this.registerEvent(this.app.workspace.on('file-open', () => this.outline.sync()));
+    this.registerEvent(this.app.metadataCache.on('changed', () => this.outline.sync()));
+    this.register(() => this.outline.stop());
 
     this.addCommand({
       id: 'toggle-shown-numbers',
@@ -285,6 +299,7 @@ export default class SectionNumberingPlugin extends Plugin {
       if (leaf.view instanceof MarkdownView) leaf.view.previewMode.rerender(true);
     }
     for (const block of this.liveBlocks) void block.refresh();
+    this.outline.sync();
   }
 
   async loadSettings() {
@@ -471,6 +486,176 @@ class LiveContents extends MarkdownRenderChild {
   }
 }
 
+/** The class of a number drawn in the Outline pane, besides `NUMBER_CLASS`. */
+const OUTLINE_NUMBER_CLASS = 'section-numbering-outline-number';
+
+/** One heading row of the Outline pane, as its own (undocumented) tree holds it. */
+interface OutlineRow {
+  innerEl: HTMLElement;
+  heading: OutlineHeading;
+}
+
+interface Watched {
+  root: HTMLElement;
+  observer: MutationObserver;
+  timer: number | null;
+}
+
+/**
+ * The shown numbers in the core Outline pane.
+ *
+ * The pane is not a public API, so everything about it is checked before it
+ * is used: a row's heading must say its line, level and text, and the
+ * number is only drawn when the plugin's own reading of the note agrees on
+ * all three. When the pane is not built the way expected, nothing is drawn.
+ * The pane redraws its rows on its own; a MutationObserver on each pane's
+ * content puts the numbers back, and is paused while they are written so it
+ * never answers its own changes.
+ */
+class OutlineNumbers {
+  private watched = new Map<View, Watched>();
+
+  constructor(private plugin: SectionNumberingPlugin) {}
+
+  private enabled(): boolean {
+    return this.plugin.settings.showNumbers && this.plugin.settings.showInOutline;
+  }
+
+  /** Starts or stops watching every open Outline pane, and redraws their numbers soon. */
+  sync(): void {
+    const views = this.enabled() ? this.plugin.app.workspace.getLeavesOfType('outline').map((leaf) => leaf.view) : [];
+    for (const view of [...this.watched.keys()]) if (!views.includes(view)) this.unwatch(view);
+    for (const view of views) {
+      if (!this.watched.has(view)) this.watch(view);
+      this.schedule(view);
+    }
+  }
+
+  /** Takes every drawn number out of the panes and stops watching them. */
+  stop(): void {
+    for (const view of [...this.watched.keys()]) this.unwatch(view);
+  }
+
+  private watch(view: View): void {
+    const root = view instanceof ItemView ? view.contentEl : view.containerEl;
+    const observer = new MutationObserver(() => this.schedule(view));
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+    this.watched.set(view, { root, observer, timer: null });
+  }
+
+  private unwatch(view: View): void {
+    const watched = this.watched.get(view);
+    if (!watched) return;
+    this.watched.delete(view);
+    watched.observer.disconnect();
+    if (watched.timer !== null) watched.root.win.clearTimeout(watched.timer);
+    watched.root.querySelectorAll(`.${OUTLINE_NUMBER_CLASS}`).forEach((el) => el.remove());
+  }
+
+  /** Redraws one pane's numbers once its own redraw has settled. */
+  private schedule(view: View): void {
+    const watched = this.watched.get(view);
+    if (!watched || watched.timer !== null) return;
+    watched.timer = watched.root.win.setTimeout(() => {
+      watched.timer = null;
+      this.refresh(view).catch((error) => console.error('section-numbering: could not number the Outline', error));
+    }, 50);
+  }
+
+  private async refresh(view: View): Promise<void> {
+    const path = view.getState().file;
+    if (typeof path !== 'string') return this.draw(view, []);
+    const file = this.plugin.app.vault.getAbstractFileByPath(path);
+    if (!(file instanceof TFile) || file.extension !== 'md') return this.draw(view, []);
+    // The text on disk is what the metadata cache, and so the pane, was built from.
+    const text = await this.plugin.app.vault.cachedRead(file);
+    if (!this.watched.has(view) || view.getState().file !== path) return;
+    const rows = outlineRows(view);
+    if (!rows) return this.draw(view, []);
+    const labels = outlineLabels(
+      rows.map((row) => row.heading),
+      this.plugin.numbersToShow(text),
+    );
+    this.draw(
+      view,
+      rows.map((row, i) => ({ el: row.innerEl, label: labels[i] })),
+    );
+  }
+
+  /** Writes the labels, with the observer paused; rows not listed lose any number. */
+  private draw(view: View, rows: Array<{ el: HTMLElement; label: string | null }>): void {
+    const watched = this.watched.get(view);
+    if (!watched) return;
+    const { root, observer } = watched;
+    observer.disconnect();
+    try {
+      const listed = new Set(rows.map((row) => row.el));
+      root.querySelectorAll(`.${OUTLINE_NUMBER_CLASS}`).forEach((el) => {
+        if (!el.parentElement || !listed.has(el.parentElement)) el.remove();
+      });
+      for (const { el, label } of rows) setOutlineLabel(el, label);
+    } finally {
+      observer.takeRecords();
+      observer.observe(root, { childList: true, subtree: true, characterData: true });
+    }
+  }
+}
+
+/** Puts `label` in front of a row's text, or takes it away when null. Touches nothing that is already right. */
+function setOutlineLabel(el: HTMLElement, label: string | null): void {
+  const existing = Array.from(el.children).filter((child) => child.classList.contains(OUTLINE_NUMBER_CLASS));
+  if (label !== null && existing.length === 1 && el.firstChild === existing[0] && existing[0].textContent === label) return;
+  existing.forEach((child) => child.remove());
+  if (label === null) return;
+  const span = el.createSpan({ cls: [NUMBER_CLASS, OUTLINE_NUMBER_CLASS], text: label, attr: { 'aria-hidden': 'true' } });
+  el.prepend(span);
+}
+
+/**
+ * Every heading row of an Outline pane, collapsed ones and ones scrolled out
+ * of view included, in the pane's order. Null when the pane is not built as
+ * expected, so nothing is guessed.
+ */
+function outlineRows(view: View): OutlineRow[] | null {
+  const tree: unknown = (view as unknown as { tree?: unknown }).tree;
+  const root = field(tree, 'root');
+  if (root === undefined) return null;
+  const rows: OutlineRow[] = [];
+  const walk = (node: unknown, depth: number): boolean => {
+    if (depth > 6) return false;
+    const children = field(field(node, 'vChildren'), '_children');
+    if (!Array.isArray(children)) return false;
+    for (const child of children) {
+      const row = outlineRow(child);
+      if (!row) return false;
+      rows.push(row);
+      if (!walk(child, depth + 1)) return false;
+    }
+    return true;
+  };
+  return walk(root, 0) ? rows : null;
+}
+
+function outlineRow(item: unknown): OutlineRow | null {
+  const innerEl = field(item, 'innerEl');
+  const heading = field(item, 'heading');
+  const text = field(heading, 'heading');
+  const level = field(heading, 'level');
+  const line = field(field(field(heading, 'position'), 'start'), 'line');
+  if (!isElement(innerEl) || typeof text !== 'string') return null;
+  if (typeof level !== 'number' || typeof line !== 'number') return null;
+  return { innerEl, heading: { line, level, text } };
+}
+
+/** `instanceof` that also holds for an element of a pop-out window. */
+function isElement(value: unknown): value is HTMLElement {
+  return typeof value === 'object' && value !== null && 'instanceOf' in value && (value as Node).instanceOf(HTMLElement);
+}
+
+function field(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+}
+
 function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
 }
@@ -520,6 +705,13 @@ const SETTINGS: SettingRow[] = [
       'Draw the numbers in front of headings, in the editor and in reading view, without writing them into the note. ' +
       'Links keep working with nothing to rewrite. A note whose headings already have written numbers, ' +
       'or whose properties say "number headings: off", is left as it is.',
+  },
+  {
+    key: 'showInOutline',
+    name: 'Show numbers in the Outline',
+    desc:
+      'When numbers are shown without changing notes, also show them in front of the headings in the Outline sidebar. ' +
+      'Has no effect on notes whose numbers are written into the text, which the Outline already shows.',
   },
   {
     key: 'firstLevel',

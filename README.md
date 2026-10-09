@@ -35,6 +35,12 @@ headings` property, `^skipped` headings included. A note whose headings already
 have written numbers is left as it is, so a number never shows twice, and
 `number headings: off` turns them off for a note.
 
+The core Outline sidebar shows the same numbers in front of each heading, so
+you see them where you navigate too, and they follow your edits there as well.
+Turn off **Show numbers in the Outline** to keep the Outline plain. Headings
+the plugin does not number, such as `^skipped` ones or headings underlined
+with `===`, appear in the Outline as they always did.
+
 Shown numbers are not part of the text, so they are not in exports, copies or
 other apps. *Copy this note with heading numbers* puts the note on the
 clipboard with the numbers written in, for pasting elsewhere; the note itself
@@ -122,6 +128,7 @@ line ends with `^toc`: rename the label, or make it a heading such as
 | Setting | Default | |
 |---|---|---|
 | Show numbers without changing notes | Off | Draws the numbers in front of headings without writing them. See [Show numbers without changing the note](#show-numbers-without-changing-the-note). |
+| Show numbers in the Outline | On | While numbers are shown without changing notes, the Outline sidebar shows them too. It has no effect otherwise. |
 | First numbered level | Automatic | The level that gets a single number. Automatic uses the shallowest heading in each note. Shallower headings stay unnumbered and restart the count, so with level 2 each `#` chapter numbers its sections from 1. |
 | Last numbered level | Heading 6 | Deeper headings are left as they are. |
 | Top-level numbers | 1, 2, 3 | Or A, B, C; a, b, c; I, II, III; i, ii, iii; or Chinese numerals 一, 二, 三 (十, 十一, 二十一, 一百 ...). |
