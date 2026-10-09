@@ -4,7 +4,7 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
-## Unreleased
+## 0.7.0
 
 - **Numbers in the Outline.** While numbers are shown without changing notes, the core Outline sidebar shows the same numbers in front of each heading, with the same styles, templates and skipped headings, and keeps them up to date as you edit. A new setting, Show numbers in the Outline (on by default), turns this off. Notes are never changed.
 
