@@ -621,8 +621,12 @@ function setOutlineLabel(el: HTMLElement, label: string | null): void {
  * expected, so nothing is guessed.
  */
 function outlineRows(view: View): OutlineRow[] | null {
-  const tree: unknown = (view as unknown as { tree?: unknown }).tree;
-  const root = field(tree, 'root');
+  // Obsidian 1.4 keeps the rows under treeView.infinityScroll.rootEl; later
+  // versions under tree.root.
+  const internals = view as unknown as { tree?: unknown; treeView?: unknown };
+  const root = internals.tree !== undefined
+    ? field(internals.tree, 'root')
+    : field(field(internals.treeView, 'infinityScroll'), 'rootEl');
   if (root === undefined) return null;
   const rows: OutlineRow[] = [];
   const walk = (node: unknown, depth: number): boolean => {
