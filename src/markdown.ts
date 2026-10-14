@@ -24,7 +24,20 @@ export interface Edit {
   insert: string;
 }
 
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
+/**
+ * A fence line: indented (under a list item, with spaces or a tab), inside a
+ * quote or callout (`> `), or opening a list item (`- `). The first group is
+ * the quote markers, the second the fence.
+ */
+const FENCE_OPEN = /^((?:[ \t]*>[ \t]?)*)[ \t]*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?(`{3,}|~{3,})/;
+
+/** How many quote or callout levels a line sits in: two for `> > text`. */
+function quoteDepth(line: string): number {
+  return (/^(?:[ \t]*>[ \t]?)*/.exec(line)?.[0] ?? '').split('>').length - 1;
+}
+
+/** A line that starts an HTML comment block, which runs to the line holding `-->`. */
+const HTML_COMMENT_OPEN = /^ {0,3}<!--/;
 
 /**
  * Splits `text` into lines and classifies each one.
@@ -33,12 +46,14 @@ const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
  * on a run of the same character at least as long as the one that opened
  * it, as CommonMark says, so a ```` block can quote a ``` block. `%%` starts
  * and ends an Obsidian comment, which can span lines; a line that holds a
- * whole `%%…%%` comment is still body text.
+ * whole `%%…%%` comment is still body text. So does an HTML comment that
+ * opens a line with `<!--` and closes on a later one.
  */
 export function scanLines(text: string): Line[] {
   const lines: Line[] = [];
-  let fence: { char: string; length: number } | null = null;
+  let fence: { char: string; length: number; depth: number } | null = null;
   let inComment = false;
+  let inHtmlComment = false;
   let frontmatter = false;
 
   let start = 0;
@@ -57,22 +72,33 @@ export function scanLines(text: string): Line[] {
       kind = 'frontmatter';
       const trimmed = trimEnd(raw);
       if (trimmed === '---' || trimmed === '...') frontmatter = false;
-    } else if (fence) {
+    } else if (fence && quoteDepth(raw) >= fence.depth) {
       kind = 'code';
-      const close = /^ {0,3}(`+|~+)[ \t]*$/.exec(raw);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.length) fence = null;
+      const close = /^(?:[ \t]*>[ \t]?)*[ \t]*(`+|~+)[ \t]*$/.exec(raw);
+      // A `> ```` line in a block opened outside any quote is code, not its end.
+      if (close && close[1][0] === fence.char && close[1].length >= fence.length && quoteDepth(raw) === fence.depth) {
+        fence = null;
+      }
     } else if (inComment) {
       kind = 'comment';
       if (countOf(raw, '%%') % 2 === 1) inComment = false;
+    } else if (inHtmlComment) {
+      kind = 'comment';
+      if (raw.includes('-->')) inHtmlComment = false;
     } else {
+      // A block opened inside a quote or callout ends with it, closed or not.
+      fence = null;
       const open = FENCE_OPEN.exec(raw);
       // A backtick fence's info string may not contain a backtick; if it
       // does, the line is inline code, not a fence.
-      if (open && !(open[1][0] === '`' && raw.slice(open[0].length).includes('`'))) {
-        fence = { char: open[1][0], length: open[1].length };
+      if (open && !(open[2][0] === '`' && raw.slice(open[0].length).includes('`'))) {
+        fence = { char: open[2][0], length: open[2].length, depth: quoteDepth(raw) };
         kind = 'code';
       } else if (countOf(raw, '%%') % 2 === 1) {
         inComment = true;
+        kind = 'comment';
+      } else if (HTML_COMMENT_OPEN.test(raw) && !raw.includes('-->', raw.indexOf('<!--') + 4)) {
+        inHtmlComment = true;
         kind = 'comment';
       } else {
         kind = 'body';

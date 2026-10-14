@@ -92,3 +92,11 @@ test('keeps the backslash of an alias pipe escaped inside a table', () => {
     '| [[Guide#2.1. Setup\\|setting up]] | [[#2.1. Setup\\|here]] |',
   );
 });
+
+test('links inside code in a callout or a list item are left alone', () => {
+  const note = '> ```md\n> [[#Setup]]\n> ```\n- item\n\t```\n\t[[Guide#Setup]]\n\t```\n[[#Setup]]';
+  assert.equal(
+    retarget(note, (path) => path === '' || toGuide(path)),
+    '> ```md\n> [[#Setup]]\n> ```\n- item\n\t```\n\t[[Guide#Setup]]\n\t```\n[[#2.1. Setup]]',
+  );
+});
