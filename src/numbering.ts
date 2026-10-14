@@ -251,7 +251,10 @@ function prefixSources(settings: NumberingSettings): { bare: string; templated: 
   // letters and Roman numerals are only read when configured.
   const configured = tokenPattern(styles, false);
   const any = tokenPattern(styles, true);
-  const marked = SEPARATORS.filter((s) => s !== '')
+  // With no separator configured the number is followed by a space, and a
+  // spaced dash after it (`1 - Intro`) is the heading's own text: read as a
+  // separator, renumbering would delete it.
+  const marked = SEPARATORS.filter((s) => s !== '' && (settings.separator !== '' || !s.startsWith(' ')))
     .sort((a, b) => b.length - a.length)
     .map(escapeRegExp)
     .join('|');

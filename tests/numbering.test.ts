@@ -189,3 +189,29 @@ test('a numbered note whose sections were moved is still renumbered', () => {
   assert.equal(numbered('## 1.2 Terms\n## 1.1 Scope\n'), '## 1. Terms\n## 2. Scope\n');
   assert.equal(numbered('# 2 B\n## 2.1 C\n# 1 A\n## 1.1 D\n', { separator: '' }), '# 1 B\n## 1.1 C\n# 2 A\n## 2.1 D\n');
 });
+
+test('a heading inside an HTML comment block is not numbered', () => {
+  assert.equal(numbered('<!--\n# Draft\n-->\n# One\n## Two'), '<!--\n# Draft\n-->\n# 1. One\n## 1.1. Two');
+  assert.equal(numbered('<!-- one line -->\n# One'), '<!-- one line -->\n# 1. One');
+});
+
+test('a heading inside code in a callout or a list is not numbered', () => {
+  assert.equal(
+    numbered('# One\n> ```md\n> # Not a heading\n> ```\n- item\n\t```\n\t# comment\n\t```\n# Two'),
+    '# 1. One\n> ```md\n> # Not a heading\n> ```\n- item\n\t```\n\t# comment\n\t```\n# 2. Two',
+  );
+  // A block left open in a callout ends with the callout.
+  assert.equal(numbered('> ```\n> code\n\n# One'), '> ```\n> code\n\n# 1. One');
+});
+
+test('with no separator, a dash that starts the heading text stays', () => {
+  const settings = { separator: '' as const };
+  const once = numbered('# - Interlude\n# — Coda', settings);
+  assert.equal(once, '# 1 - Interlude\n# 2 — Coda');
+  assert.equal(numbered(once, settings), once);
+  assert.equal(removed(once, settings), '# - Interlude\n# — Coda');
+});
+
+test('a quoted fence inside a code block does not end it', () => {
+  assert.equal(numbered('# One\n```md\n> ```\n# not a heading\n```\n# Two'), '# 1. One\n```md\n> ```\n# not a heading\n```\n# 2. Two');
+});
