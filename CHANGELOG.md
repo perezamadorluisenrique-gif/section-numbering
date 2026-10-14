@@ -4,6 +4,10 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.8.2
+
+- Heading numbers now show in the Outline on Obsidian 1.4 too.
+
 ## 0.8.1
 
 - A heading inside an HTML comment (`<!--` … `-->` over several lines) is no longer numbered, so it no longer shifts the numbers of the headings you can see.
