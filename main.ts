@@ -11,6 +11,7 @@ import type { Edit } from './src/markdown.ts';
 import { applyEdits } from './src/markdown.ts';
 import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, planRemoval, rememberTemplates, shownNumbers } from './src/numbering.ts';
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
+import { t } from './src/i18n.ts';
 import { outlineLabels } from './src/outline.ts';
 import type { OutlineHeading } from './src/outline.ts';
 
@@ -75,21 +76,21 @@ export default class SectionNumberingPlugin extends Plugin {
 
     this.addCommand({
       id: 'toggle-shown-numbers',
-      name: 'Show or hide heading numbers (without changing notes)',
+      name: t('command.toggleShownNumbers'),
       icon: 'hash',
       callback: async () => {
         this.settings.showNumbers = !this.settings.showNumbers;
         await this.saveSettings();
         new Notice(
           this.settings.showNumbers
-            ? 'Showing heading numbers. Your notes are not changed.'
-            : 'Heading numbers are no longer shown.',
+            ? t('notice.showingNumbers')
+            : t('notice.hidingNumbers'),
         );
       },
     });
     this.addCommand({
       id: 'insert-live-contents',
-      name: 'Insert live table of contents',
+      name: t('command.insertLiveContents'),
       icon: 'list-tree',
       editorCallback: (editor) => {
         const cursor = editor.getCursor();
@@ -106,7 +107,7 @@ export default class SectionNumberingPlugin extends Plugin {
     });
     this.addCommand({
       id: 'copy-with-numbers',
-      name: 'Copy this note with heading numbers',
+      name: t('command.copyWithNumbers'),
       icon: 'clipboard-copy',
       editorCallback: (editor) => {
         const text = editor.getValue();
@@ -114,34 +115,34 @@ export default class SectionNumberingPlugin extends Plugin {
         if (!settings) return;
         const numbered = applyEdits(text, planNumbering(text, settings).edits);
         navigator.clipboard.writeText(numbered).then(
-          () => new Notice('Copied the note with its headings numbered. The note itself is unchanged.'),
-          () => new Notice('Could not write to the clipboard.'),
+          () => new Notice(t('notice.copied')),
+          () => new Notice(t('notice.clipboardFailed')),
         );
       },
     });
 
     this.addCommand({
       id: 'number-headings',
-      name: 'Number headings in this note',
+      name: t('command.numberHeadings'),
       icon: 'list-ordered',
       editorCallback: (editor, ctx) => {
         const settings = this.settingsFor(editor.getValue());
-        if (settings) void this.apply(editor, ctx.file, planNumbering(editor.getValue(), settings), 'Numbered');
+        if (settings) void this.apply(editor, ctx.file, planNumbering(editor.getValue(), settings), 'numbered');
       },
     });
     this.addCommand({
       id: 'remove-heading-numbers',
-      name: 'Remove heading numbers in this note',
+      name: t('command.removeNumbers'),
       icon: 'list-x',
       editorCallback: (editor, ctx) => {
         const settings = this.settingsFor(editor.getValue());
-        if (settings) void this.apply(editor, ctx.file, planRemoval(editor.getValue(), settings), 'Removed numbers from');
+        if (settings) void this.apply(editor, ctx.file, planRemoval(editor.getValue(), settings), 'removed');
       },
     });
 
     this.addCommand({
       id: 'table-of-contents',
-      name: 'Insert or update table of contents',
+      name: t('command.tableOfContents'),
       icon: 'list-tree',
       editorCallback: (editor) => {
         const text = editor.getValue();
@@ -155,7 +156,7 @@ export default class SectionNumberingPlugin extends Plugin {
               changes: [{ from: editor.offsetToPos(edit.from), to: editor.offsetToPos(edit.to), text: edit.insert }],
             });
           }
-          new Notice(edit ? 'Updated the table of contents.' : 'The table of contents is up to date.');
+          new Notice(edit ? t('notice.contentsUpdated') : t('notice.contentsUpToDate'));
           return;
         }
         const cursor = editor.getCursor();
@@ -167,13 +168,13 @@ export default class SectionNumberingPlugin extends Plugin {
           const end = { line: cursor.line, ch: line.length };
           editor.transaction({ changes: [{ from: end, text: '\n' + block.replace(/\n$/, '') }] });
         }
-        new Notice('Inserted a table of contents. Numbering the headings keeps it up to date.');
+        new Notice(t('notice.contentsInserted'));
       },
     });
 
     this.addCommand({
       id: 'save-settings-to-properties',
-      name: "Save numbering settings to this note's properties",
+      name: t('command.saveToProperties'),
       icon: 'save',
       editorCheckCallback: (checking, _editor, ctx) => {
         const file = ctx.file;
@@ -215,12 +216,12 @@ export default class SectionNumberingPlugin extends Plugin {
       });
       new Notice(
         this.settings.readFrontMatter
-          ? 'Saved the numbering settings to this note\'s properties.'
-          : 'Saved the numbering settings to this note\'s properties. They only apply while "Follow Number Headings properties" is on.',
+          ? t('notice.propertiesSaved')
+          : t('notice.propertiesSavedNotFollowed'),
       );
     } catch (error) {
       console.error('section-numbering: could not save the settings to the properties', error);
-      new Notice("Could not write this note's properties. Check that they are valid YAML.");
+      new Notice(t('notice.propertiesFailed'));
     }
   }
 
@@ -239,7 +240,7 @@ export default class SectionNumberingPlugin extends Plugin {
     const own = noteSettings(text);
     if (own === null) return this.settings;
     if (own.off) {
-      if (!quiet) new Notice('This note has "number headings: off" in its properties, so its headings were left alone.');
+      if (!quiet) new Notice(t('notice.noteOff'));
       return null;
     }
     return mergeNoteSettings(this.settings, own.settings);
@@ -322,7 +323,7 @@ export default class SectionNumberingPlugin extends Plugin {
    * notes are rewritten on disk afterwards; undo in this note does not
    * reach them, which the notice says.
    */
-  private async apply(editor: Editor, file: TFile | null, plan: Plan, verb: string): Promise<void> {
+  private async apply(editor: Editor, file: TFile | null, plan: Plan, verb: 'numbered' | 'removed'): Promise<void> {
     const text = editor.getValue();
     // The table of contents, if the note has one, follows the headings as
     // they will be after this edit, in the same transaction.
@@ -333,9 +334,9 @@ export default class SectionNumberingPlugin extends Plugin {
         editor.transaction({
           changes: [{ from: editor.offsetToPos(contents.from), to: editor.offsetToPos(contents.to), text: contents.insert }],
         });
-        new Notice('No heading needed changing. Updated the table of contents.');
+        new Notice(t('notice.nothingToChangeContentsUpdated'));
       } else {
-        new Notice('No heading needed changing.');
+        new Notice(t('notice.nothingToChange'));
       }
       return;
     }
@@ -353,10 +354,13 @@ export default class SectionNumberingPlugin extends Plugin {
       })),
     });
 
-    let message = `${verb} ${count(plan.changed, 'heading')}.`;
+    let message =
+      plan.changed === 1
+        ? t(`notice.${verb}.one`)
+        : t(`notice.${verb}.other`, { count: plan.changed });
     if (file && this.settings.updateLinks) {
       const { links, notes } = await this.updateLinksElsewhere(file, plan.renames);
-      if (links > 0) message += ` Updated ${count(links, 'link')} in ${count(notes, 'other note')}.`;
+      if (links > 0) message += ` ${linksUpdated(links, notes)}`;
     }
     new Notice(message);
     await this.rememberTemplates(settings);
@@ -464,7 +468,7 @@ class LiveContents extends MarkdownRenderChild {
     el.empty();
     const entries = this.plugin.liveEntries(text, this.source);
     if (entries.length === 0) {
-      el.createDiv({ cls: 'section-numbering-contents-empty', text: 'No headings to list yet.' });
+      el.createDiv({ cls: 'section-numbering-contents-empty', text: t('contents.empty') });
       return;
     }
     // Nested lists, one level of nesting per heading level below the first.
@@ -656,30 +660,38 @@ function field(value: unknown, key: string): unknown {
   return typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
 }
 
-function count(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+/** "Updated 3 links in 2 other notes.", worded for the numbers: a link is in a note, so there are never more notes than links. */
+function linksUpdated(links: number, notes: number): string {
+  if (links === 1) return t('notice.linksUpdated.one');
+  return notes === 1 ? t('notice.linksUpdated.manyInOne', { links }) : t('notice.linksUpdated.manyInMany', { links, notes });
 }
 
-const STYLE_OPTIONS: Record<NumberStyle, string> = {
+const styleOptions = (): Record<NumberStyle, string> => ({
   '1': '1, 2, 3',
   A: 'A, B, C',
   a: 'a, b, c',
   I: 'I, II, III',
   i: 'i, ii, iii',
-  一: '一, 二, 三 (Chinese)',
+  一: t('option.chineseNumerals'),
+});
+
+const separatorOptions = (): Record<Separator, string> => {
+  const heading = t('option.headingExample');
+  return {
+    '.': `1.2. ${heading}`,
+    ')': `1.2) ${heading}`,
+    ':': `1.2: ${heading}`,
+    ' —': `1.2 — ${heading}`,
+    ' -': `1.2 - ${heading}`,
+    '': `1.2 ${heading}`,
+  };
 };
 
-const SEPARATOR_OPTIONS: Record<Separator, string> = {
-  '.': '1.2. Heading',
-  ')': '1.2) Heading',
-  ':': '1.2: Heading',
-  ' —': '1.2 — Heading',
-  ' -': '1.2 - Heading',
-  '': '1.2 Heading',
+const levelOptions = (): Record<string, string> => {
+  const options: Record<string, string> = {};
+  for (const level of LEVELS) options[String(level)] = t('option.level', { level });
+  return options;
 };
-
-const LEVEL_OPTIONS: Record<string, string> = {};
-for (const level of LEVELS) LEVEL_OPTIONS[String(level)] = `Heading ${level}`;
 
 type SettingKey = keyof SectionNumberingSettings;
 
@@ -695,91 +707,47 @@ interface SettingRow {
 
 /**
  * Every setting, described once. Both renderings below are built from this
- * table, so the declarative one and the pre-1.13 fallback cannot drift.
+ * table, so the declarative one and the pre-1.13 fallback cannot drift. It is
+ * a function so the texts are looked up when the tab is drawn.
  */
-const SETTINGS: SettingRow[] = [
-  {
-    key: 'showNumbers',
-    name: 'Show numbers without changing notes',
-    desc:
-      'Draw the numbers in front of headings, in the editor and in reading view, without writing them into the note. ' +
-      'Links keep working with nothing to rewrite. A note whose headings already have written numbers, ' +
-      'or whose properties say "number headings: off", is left as it is.',
-  },
-  {
-    key: 'showInOutline',
-    name: 'Show numbers in the Outline',
-    desc:
-      'When numbers are shown without changing notes, also show them in front of the headings in the Outline sidebar. ' +
-      'Has no effect on notes whose numbers are written into the text, which the Outline already shows.',
-  },
-  {
-    key: 'firstLevel',
-    name: 'First numbered level',
-    desc:
-      'The heading level that gets a single number. Automatic uses the shallowest heading in each note. ' +
-      'Shallower headings stay unnumbered and restart the count.',
-    options: { auto: 'Automatic', ...LEVEL_OPTIONS },
-  },
-  {
-    key: 'maxLevel',
-    name: 'Last numbered level',
-    desc: 'Deeper headings are left as they are.',
-    options: LEVEL_OPTIONS,
-  },
-  { key: 'topStyle', name: 'Top-level numbers', desc: 'How the first number is written.', options: STYLE_OPTIONS },
-  {
-    key: 'otherStyle',
-    name: 'Lower-level numbers',
-    desc: 'How every number after the first is written.',
-    options: STYLE_OPTIONS,
-  },
-  {
-    key: 'separator',
-    name: 'Separator',
-    desc:
-      'What follows the number. With no separator, a heading that already starts with a number, ' +
-      'such as "2024 in review", is taken to be numbered and loses it.',
-    options: SEPARATOR_OPTIONS,
-  },
-  {
-    key: 'skipAnchor',
-    name: 'Skip anchor',
-    desc:
-      'A heading whose line ends with this block id, such as "## Preface ^skipped", is not numbered and takes no number. ' +
-      'It stays out of the table of contents. Leave empty to turn skipping off.',
-    text: { placeholder: '^skipped', defaultValue: '^skipped' },
-  },
-  {
-    key: 'topTemplate',
-    name: 'Top-level template',
-    desc:
-      'Text around the number of top-level headings, with {n} for the number: "Chapter {n}." gives "Chapter 1. Intro". ' +
-      'Text after {n} replaces the separator; with none ("Chapter {n}") the separator still follows. ' +
-      'Numbering again replaces text written by an earlier template.',
-    text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
-  },
-  {
-    key: 'otherTemplate',
-    name: 'Lower-level template',
-    desc: 'The same for every heading below the top level, where {n} is the whole number, as in "Section {n}" for "Section 1.2".',
-    text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
-  },
-  {
-    key: 'readFrontMatter',
-    name: 'Follow Number Headings properties',
-    desc:
-      'A note whose properties have a "number headings" entry, as the Number Headings plugin writes it, ' +
-      'is numbered the way that entry says, and "number headings: off" leaves the note alone.',
-  },
-  {
-    key: 'updateLinks',
-    name: 'Update links in other notes',
-    desc:
-      'When a heading is renumbered, rewrite links to it in the rest of the vault so they keep working. ' +
-      'Links within the note itself are always updated.',
-  },
-];
+function settingRows(): SettingRow[] {
+  // The templates' own `{n}` is shown to the user as it is.
+  const n = { n: '{n}' };
+  return [
+    { key: 'showNumbers', name: t('setting.showNumbers.name'), desc: t('setting.showNumbers.desc') },
+    { key: 'showInOutline', name: t('setting.showInOutline.name'), desc: t('setting.showInOutline.desc') },
+    {
+      key: 'firstLevel',
+      name: t('setting.firstLevel.name'),
+      desc: t('setting.firstLevel.desc'),
+      options: { auto: t('option.automatic'), ...levelOptions() },
+    },
+    { key: 'maxLevel', name: t('setting.maxLevel.name'), desc: t('setting.maxLevel.desc'), options: levelOptions() },
+    { key: 'topStyle', name: t('setting.topStyle.name'), desc: t('setting.topStyle.desc'), options: styleOptions() },
+    { key: 'otherStyle', name: t('setting.otherStyle.name'), desc: t('setting.otherStyle.desc'), options: styleOptions() },
+    { key: 'separator', name: t('setting.separator.name'), desc: t('setting.separator.desc'), options: separatorOptions() },
+    {
+      key: 'skipAnchor',
+      name: t('setting.skipAnchor.name'),
+      desc: t('setting.skipAnchor.desc'),
+      text: { placeholder: '^skipped', defaultValue: '^skipped' },
+    },
+    {
+      key: 'topTemplate',
+      name: t('setting.topTemplate.name'),
+      desc: t('setting.topTemplate.desc', n),
+      text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
+    },
+    {
+      key: 'otherTemplate',
+      name: t('setting.otherTemplate.name'),
+      desc: t('setting.otherTemplate.desc', n),
+      text: { placeholder: DEFAULT_TEMPLATE, defaultValue: DEFAULT_TEMPLATE },
+    },
+    { key: 'readFrontMatter', name: t('setting.readFrontMatter.name'), desc: t('setting.readFrontMatter.desc') },
+    { key: 'updateLinks', name: t('setting.updateLinks.name'), desc: t('setting.updateLinks.desc') },
+  ];
+}
 
 /** What a control shows: numbers as strings, the skip anchor with its `^`. */
 function displayValue(key: string, value: unknown): unknown {
@@ -804,7 +772,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
    * versions do not know this method and call `display()` instead.
    */
   getSettingDefinitions(): SettingDefinitionItem[] {
-    return SETTINGS.map((row) => ({
+    return settingRows().map((row) => ({
       name: row.name,
       desc: row.desc,
       control: row.text
@@ -841,7 +809,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    for (const row of SETTINGS) {
+    for (const row of settingRows()) {
       const setting = new Setting(containerEl).setName(row.name).setDesc(row.desc);
       const current = this.getControlValue(row.key);
       if (row.options) {
