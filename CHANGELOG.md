@@ -4,6 +4,12 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.8.1
+
+- A heading inside an HTML comment (`<!--` … `-->` over several lines) is no longer numbered, so it no longer shifts the numbers of the headings you can see.
+- With the separator set to none, a heading whose text starts with a dash (`# - Interlude`) keeps the dash when renumbered or when numbers are removed.
+- Links inside code blocks in callouts or list items are no longer rewritten when the heading they name is renumbered.
+
 ## 0.8.0
 
 - Interface available in 8 more languages (Simplified Chinese, Japanese, Korean, Spanish, German, French, Brazilian Portuguese and Russian), following Obsidian's language setting.
