@@ -3,8 +3,11 @@ import type { MarkdownPostProcessorContext, SettingDefinitionItem, View } from '
 
 import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
 
+import { createExtensions } from './src/api.ts';
+import type { SectionNumberingApiV1 } from './src/api.ts';
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
-import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
+import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
+import { decideNote } from './src/guard.ts';
 import { retargetLinks } from './src/links.ts';
 import { LIVE_CONTENTS_LANGUAGE, headingLink, liveContentsEntries, newLiveBlock, parseLiveOptions } from './src/live.ts';
 import type { Edit } from './src/markdown.ts';
@@ -13,7 +16,7 @@ import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, pl
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
 import { t } from './src/i18n.ts';
 import { outlineLabels } from './src/outline.ts';
-import { normalizeFolder, renameRules, resolveSettings, ruleFor, ruleTemplates } from './src/rules.ts';
+import { normalizeFolder, renameRules, ruleFor, ruleTemplates } from './src/rules.ts';
 import type { FolderRule } from './src/rules.ts';
 import type { OutlineHeading } from './src/outline.ts';
 
@@ -51,8 +54,12 @@ export default class SectionNumberingPlugin extends Plugin {
   /** The last note text whose shown numbers were worked out, for reading view. */
   private shownCache: { text: string; path: string; byLine: Map<number, string> } | null = null;
   private outline = new OutlineNumbers(this);
+  private extensions = createExtensions((message, error) => console.error(message, error));
+  /** What other plugins use: `app.plugins.getPlugin('section-numbering').api`. Null while unloaded. */
+  api: SectionNumberingApiV1 | null = null;
 
   async onload() {
+    this.api = this.extensions.api(() => this.redraw());
     await this.loadSettings();
 
     this.registerEditorExtension(
@@ -219,6 +226,15 @@ export default class SectionNumberingPlugin extends Plugin {
     );
 
     this.addSettingTab(new SectionNumberingSettingTab(this.app, this));
+
+    // Last, so a plugin that listens for this finds a plugin that is ready.
+    // A reload drops every claim, which is why they are made again on this.
+    this.app.workspace.trigger('section-numbering:api-ready', this.api);
+  }
+
+  onunload(): void {
+    this.extensions.close();
+    this.api = null;
   }
 
   /**
@@ -280,20 +296,39 @@ export default class SectionNumberingPlugin extends Plugin {
   }
 
   /**
-   * The settings for one note: the plugin's, with the note's own
-   * `number headings` front matter over them. Null, after saying why, when
-   * the note asks to be left alone.
+   * The settings for one note: the plugin's, then its folder's rule, then the
+   * note's own `number headings` property. Null, after saying why unless
+   * `quiet`, when the note is left alone: it asks for that, its folder does,
+   * or another plugin numbers it (see `decideNote`).
    */
   private settingsFor(text: string, path: string, quiet = false): NumberingSettings | null {
-    const rule = ruleFor(path, this.settings.folderRules);
-    const own = this.settings.readFrontMatter ? noteSettings(text) : null;
-    const settings = resolveSettings(this.settings, rule, own);
-    if (!settings && !quiet) {
-      const folder = rule ? normalizeFolder(rule.folder) : '';
-      const ruleOff = rule !== null && own === null;
-      new Notice(ruleOff ? t('notice.folderOff', { folder: folder === '' ? '/' : folder }) : t('notice.noteOff'));
+    const decision = decideNote({
+      path,
+      text,
+      base: this.settings,
+      rules: this.settings.folderRules,
+      readFrontMatter: this.settings.readFrontMatter,
+      claim: (note) => this.extensions.claimFor(note),
+    });
+    switch (decision.kind) {
+      case 'number':
+        return decision.settings;
+      case 'claimed':
+        if (!quiet) new Notice(t('notice.claimed', { owner: decision.owner }));
+        return null;
+      case 'profile':
+        if (!quiet) new Notice(t('notice.unknownProfile', { profile: decision.profile }));
+        return null;
+      case 'off':
+        if (!quiet) {
+          new Notice(
+            decision.reason === 'folder'
+              ? t('notice.folderOff', { folder: decision.folder === '' ? '/' : decision.folder })
+              : t('notice.noteOff'),
+          );
+        }
+        return null;
     }
-    return settings;
   }
 
   /** The numbers to draw for a note's text: none unless showing is on and the note allows it. */
@@ -377,6 +412,7 @@ export default class SectionNumberingPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.redraw();
+    this.extensions.emit('settings-changed', undefined);
   }
 
   /**
@@ -425,6 +461,16 @@ export default class SectionNumberingPlugin extends Plugin {
     if (file && this.settings.updateLinks) {
       const { links, notes } = await this.updateLinksElsewhere(file, plan.renames);
       if (links > 0) message += ` ${linksUpdated(links, notes)}`;
+    }
+    if (file) {
+      this.extensions.emit('renumbered', {
+        path: file.path,
+        text: editor.getValue(),
+        kind: verb,
+        renames: new Map(plan.renames),
+        changed: plan.changed,
+        linksUpdated: this.settings.updateLinks,
+      });
     }
     new Notice(message);
     await this.rememberTemplates(settings);

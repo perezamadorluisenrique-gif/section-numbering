@@ -26,6 +26,8 @@ const en = {
     'Saved the numbering settings to this note\'s properties. They only apply while "Follow Number Headings properties" is on.',
   'notice.propertiesFailed': "Could not write this note's properties. Check that they are valid YAML.",
   'notice.noteOff': 'This note has "number headings: off" in its properties, so its headings were left alone.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'No heading needed changing. Updated the table of contents.',
   'notice.nothingToChange': 'No heading needed changing.',
   'notice.numbered.one': 'Numbered 1 heading.',

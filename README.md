@@ -236,6 +236,13 @@ follows its folder when you rename or move it, and moving a note to another
 folder numbers it by that folder's rule. Rules need no network access and
 change no note by themselves.
 
+### Notes another plugin numbers
+
+A note whose properties hold `numbering profile: something` is numbered by
+another plugin, so every numbering command and the shown numbers leave its
+headings alone, and the command says why in a notice. `numbering profile:
+off` means no profile: the note is numbered as usual.
+
 ### Why the default separator is a dot
 
 To renumber, the plugin has to recognise a number it wrote earlier. With a
@@ -317,6 +324,51 @@ npm run build
 
 Everything under `src/` is free of Obsidian imports and fully unit tested;
 `main.ts` is the only file that talks to the app.
+
+## For developers
+
+Another plugin can take over the notes it numbers itself, and hear when a note
+is renumbered, through a small versioned API. It needs no setting and makes no
+network request. The types are in [`src/api.ts`](src/api.ts), which imports
+nothing, so you can copy it.
+
+```ts
+import type { App, Events } from 'obsidian';
+// Copy the types from src/api.ts.
+
+function sectionNumbering(app: App): SectionNumberingApiV1 | null {
+  const plugins = (app as unknown as { plugins?: { getPlugin?(id: string): unknown } }).plugins;
+  const api = (plugins?.getPlugin?.('section-numbering') as { api?: { apiVersion?: unknown } } | null | undefined)?.api;
+  return api && api.apiVersion === 1 ? (api as SectionNumberingApiV1) : null;
+}
+
+// In onload: register now if it is there, and again whenever Section Numbering (re)loads.
+const attach = (api: SectionNumberingApiV1 | null) => {
+  if (api) this.register(api.claimNotes('my-plugin', (note) => (isMine(note) ? { owner: 'My Plugin' } : null)));
+};
+attach(sectionNumbering(this.app));
+this.registerEvent((this.app.workspace as Events).on('section-numbering:api-ready', (api) => attach(api as SectionNumberingApiV1)));
+```
+
+- `claimNotes(id, handler)` returns a disposer. A note you claim is left alone
+  by every Section Numbering command, by its shown numbers and by its
+  Outline, so only one plugin writes numbers into it. The handler runs
+  synchronously, often (on every keystroke while numbers are shown): keep it
+  cheap and do not write from it. The first handler that claims a note wins.
+- `on('renumbered', listener)` runs after a numbering or removal command
+  changed a note and Section Numbering rewrote links to it in other notes. The
+  payload has the note's `path`, its new `text` (the editor's, which may not
+  be on disk yet), `kind`, `renames`, `changed` and `linksUpdated`. Do not
+  rewrite those links again. `on('settings-changed', listener)` runs after the
+  settings or the folder rules changed. Listeners are not awaited, and a
+  failing one affects nobody else.
+- `redraw()` draws the shown numbers, live contents blocks and the Outline
+  again: call it after your claims change.
+- Reloading Section Numbering drops every claim and listener; register again
+  on `section-numbering:api-ready`.
+- `apiVersion` only goes up on a breaking change. Optional members, events and
+  payload fields can be added to version 1, so check for them before use. A
+  later version would be offered beside this one for at least a release.
 
 ## More plugins by Siulved54
 

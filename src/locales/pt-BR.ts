@@ -23,6 +23,8 @@ const ptBR: Messages = {
     'Configurações de numeração salvas nas propriedades desta nota. Elas só valem enquanto "Follow Number Headings properties" estiver ativado.',
   'notice.propertiesFailed': 'Não foi possível escrever as propriedades desta nota. Verifique se são YAML válido.',
   'notice.noteOff': 'Esta nota tem "number headings: off" nas propriedades, então seus títulos foram deixados como estavam.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'Nenhum título precisou de alteração. Índice atualizado.',
   'notice.nothingToChange': 'Nenhum título precisou de alteração.',
   'notice.numbered.one': '1 título numerado.',

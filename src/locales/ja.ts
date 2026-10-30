@@ -23,6 +23,8 @@ const ja: Messages = {
     '番号付けの設定をこのノートのプロパティに保存しました。「Follow Number Headings properties」がオンの間だけ有効です。',
   'notice.propertiesFailed': 'このノートのプロパティを書き込めませんでした。有効な YAML か確認してください。',
   'notice.noteOff': 'このノートのプロパティに "number headings: off" があるため、見出しは変更しませんでした。',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': '変更が必要な見出しはありませんでした。目次を更新しました。',
   'notice.nothingToChange': '変更が必要な見出しはありませんでした。',
   'notice.numbered.one': '1 件の見出しに番号を付けました。',
