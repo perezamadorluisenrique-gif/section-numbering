@@ -46,6 +46,7 @@ export const FRONT_MATTER_KEY = 'number headings';
 export type NoteSettings = { off: true } | { off: false; settings: Partial<NumberingSettings> };
 
 const KEY_LINE = /^number[ _-]headings[ \t]*:[ \t]*(.*)$/i;
+const PROFILE_KEY_LINE = /^numbering[ _-]profile[ \t]*:[ \t]*(.*)$/i;
 const STYLE = /^(_\.)?([1AIai一])((?:\.[1AIai一])*)[ \t]*(\.|\)|:|—|-)?$/;
 const TEMPLATE_PART = /^template-level-(1|other)[ \t]+(.+)$/i;
 const SEPARATOR: Record<string, Separator> = { '.': '.', ')': ')', ':': ':', '—': ' —', '-': ' -' };
@@ -53,18 +54,34 @@ const SEPARATOR: Record<string, Separator> = { '.': '.', ')': ')', ':': ':', '�
 type Level = 1 | 2 | 3 | 4 | 5 | 6;
 const asLevel = (n: number): Level | null => (n >= 1 && n <= 6 ? (n as Level) : null);
 
-/** The note's `number headings` entry, unquoted, or null when it has none. */
-export function frontMatterValue(text: string): string | null {
+/** The value of the front matter line `keyLine` matches, unquoted, or null when the note has none. */
+function frontMatterEntry(text: string, keyLine: RegExp): string | null {
   let value: string | null = null;
   for (const line of scanLines(text)) {
     if (line.kind !== 'frontmatter') {
       if (value !== null || line.text.trim() !== '') break;
       continue;
     }
-    const match = KEY_LINE.exec(line.text);
+    const match = keyLine.exec(line.text);
     if (match) value = match[1];
   }
   return value === null ? null : unquote(value.trim());
+}
+
+/** The note's `number headings` entry, unquoted, or null when it has none. */
+export function frontMatterValue(text: string): string | null {
+  return frontMatterEntry(text, KEY_LINE);
+}
+
+/**
+ * The note's `numbering profile` entry: the name of a profile some other
+ * plugin numbers the note with. Null when there is none or it is empty;
+ * `off` (in any case) is returned as `'off'` and means no profile.
+ */
+export function profileValue(text: string): string | null {
+  const value = frontMatterEntry(text, PROFILE_KEY_LINE);
+  if (value === null || value === '') return null;
+  return value.toLowerCase() === 'off' ? 'off' : value;
 }
 
 /** A YAML quoted scalar's text: `\"` and `\\` inside double quotes, `''` inside single quotes. */

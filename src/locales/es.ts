@@ -23,6 +23,8 @@ const es: Messages = {
     'Se guardaron los ajustes de numeración en las propiedades de esta nota. Solo se aplican mientras "Follow Number Headings properties" esté activado.',
   'notice.propertiesFailed': 'No se pudieron escribir las propiedades de esta nota. Comprueba que sean YAML válido.',
   'notice.noteOff': 'Esta nota tiene "number headings: off" en sus propiedades, así que sus encabezados se dejaron como estaban.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'Ningún encabezado necesitaba cambios. Se actualizó la tabla de contenidos.',
   'notice.nothingToChange': 'Ningún encabezado necesitaba cambios.',
   'notice.numbered.one': 'Se numeró 1 encabezado.',

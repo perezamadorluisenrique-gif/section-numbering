@@ -23,6 +23,8 @@ const ko: Messages = {
     '번호 매기기 설정을 이 노트의 속성에 저장했습니다. "Follow Number Headings properties"가 켜져 있는 동안에만 적용됩니다.',
   'notice.propertiesFailed': '이 노트의 속성을 쓸 수 없습니다. 올바른 YAML인지 확인하세요.',
   'notice.noteOff': '이 노트의 속성에 "number headings: off"가 있어 제목을 건드리지 않았습니다.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': '변경할 제목이 없습니다. 목차를 업데이트했습니다.',
   'notice.nothingToChange': '변경할 제목이 없습니다.',
   'notice.numbered.one': '제목 1개에 번호를 매겼습니다.',

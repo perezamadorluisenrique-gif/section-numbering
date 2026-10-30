@@ -22,6 +22,8 @@ const zh: Messages = {
   'notice.propertiesSavedNotFollowed': '已将编号设置保存到此笔记的属性。仅当“Follow Number Headings properties”开启时才会生效。',
   'notice.propertiesFailed': '无法写入此笔记的属性。请检查它们是否是有效的 YAML。',
   'notice.noteOff': '此笔记的属性中有 "number headings: off"，因此其标题未做改动。',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': '没有需要修改的标题。已更新目录。',
   'notice.nothingToChange': '没有需要修改的标题。',
   'notice.numbered.one': '已为 1 个标题编号。',

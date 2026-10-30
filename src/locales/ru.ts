@@ -23,6 +23,8 @@ const ru: Messages = {
     'Настройки нумерации сохранены в свойствах этой заметки. Они действуют, только пока включено «Follow Number Headings properties».',
   'notice.propertiesFailed': 'Не удалось записать свойства этой заметки. Проверьте, что это корректный YAML.',
   'notice.noteOff': 'В свойствах этой заметки есть "number headings: off", поэтому её заголовки не тронуты.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'Ни один заголовок менять не потребовалось. Оглавление обновлено.',
   'notice.nothingToChange': 'Ни один заголовок менять не потребовалось.',
   'notice.numbered.one': 'Пронумерован 1 заголовок.',

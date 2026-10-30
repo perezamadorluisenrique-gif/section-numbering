@@ -23,6 +23,8 @@ const de: Messages = {
     'Nummerierungseinstellungen in den Eigenschaften dieser Notiz gespeichert. Sie gelten nur, solange „Follow Number Headings properties“ eingeschaltet ist.',
   'notice.propertiesFailed': 'Die Eigenschaften dieser Notiz konnten nicht geschrieben werden. Prüfe, ob sie gültiges YAML sind.',
   'notice.noteOff': 'Diese Notiz hat „number headings: off“ in ihren Eigenschaften, daher wurden ihre Überschriften nicht angetastet.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'Keine Überschrift musste geändert werden. Inhaltsverzeichnis aktualisiert.',
   'notice.nothingToChange': 'Keine Überschrift musste geändert werden.',
   'notice.numbered.one': '1 Überschrift nummeriert.',

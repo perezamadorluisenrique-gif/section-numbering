@@ -23,6 +23,8 @@ const fr: Messages = {
     'Réglages de numérotation enregistrés dans les propriétés de cette note. Ils ne s’appliquent que lorsque « Follow Number Headings properties » est activé.',
   'notice.propertiesFailed': 'Impossible d’écrire les propriétés de cette note. Vérifiez qu’elles sont en YAML valide.',
   'notice.noteOff': 'Cette note a « number headings: off » dans ses propriétés ; ses titres n’ont donc pas été touchés.',
+  'notice.claimed': '{owner} numbers this note, so its headings were left alone.',
+  'notice.unknownProfile': 'This note has "numbering profile: {profile}" in its properties and no active plugin handles it, so its headings were left alone.',
   'notice.nothingToChangeContentsUpdated': 'Aucun titre à modifier. Table des matières mise à jour.',
   'notice.nothingToChange': 'Aucun titre à modifier.',
   'notice.numbered.one': '1 titre numéroté.',
