@@ -79,6 +79,23 @@ const en = {
   'setting.updateLinks.name': 'Update links in other notes',
   'setting.updateLinks.desc':
     'When a heading is renumbered, rewrite links to it in the rest of the vault so they keep working. Links within the note itself are always updated.',
+  'command.addFolderRule': 'Add a numbering rule for this note\'s folder',
+  'notice.folderOff': 'The folder rule for {folder} turns numbering off, so this note\'s headings were left alone.',
+  'setting.folderRules.name': 'Folder rules',
+  'setting.folderRules.desc': 'Give a folder its own numbering. Write a rule like a note\'s "number headings" property, for example A.1 or off. The deepest folder wins, and a note\'s own property wins over any rule.',
+  'setting.folderRules.button': 'Edit rules',
+  'folderRules.title': 'Folder rules',
+  'folderRules.empty': 'No folder rules yet.',
+  'folderRules.add': 'Add rule',
+  'folderRules.choose': 'Choose folder',
+  'folderRules.valuePlaceholder': 'Numbering, e.g. A.1 or off',
+  'folderRules.show.inherit': 'Numbers on screen: as set',
+  'folderRules.show.on': 'Numbers on screen: on',
+  'folderRules.show.off': 'Numbers on screen: off',
+  'folderRules.missing': 'Folder not found',
+  'folderRules.delete': 'Delete rule',
+  'folderRules.up': 'Move up',
+  'folderRules.down': 'Move down',
 } as const;
 
 export default en;

@@ -74,6 +74,23 @@ const ja: Messages = {
     'Number Headings プラグインが書き込む形式で、プロパティに "number headings" の項目があるノートは、その内容どおりに番号付けされます。"number headings: off" ならそのノートは変更しません。',
   'setting.updateLinks.name': '他のノートのリンクを更新',
   'setting.updateLinks.desc': '見出しの番号が変わったとき、保管庫内の残りのノートにあるそのリンクを書き換えて、リンクが機能し続けるようにします。このノート内のリンクは常に更新されます。',
+  'command.addFolderRule': 'このノートのフォルダに番号付けルールを追加',
+  'notice.folderOff': 'フォルダ {folder} のルールで番号付けがオフのため、このノートの見出しは変更しませんでした。',
+  'setting.folderRules.name': 'フォルダルール',
+  'setting.folderRules.desc': 'フォルダに独自の番号付けを設定します。ルールはノートの "number headings" プロパティと同じ書式です（A.1、_.1.1、off など）。最も深いフォルダが優先され、ノート自身のプロパティはどのルールよりも優先されます。',
+  'setting.folderRules.button': 'ルールを編集',
+  'folderRules.title': 'フォルダルール',
+  'folderRules.empty': 'フォルダルールはまだありません。',
+  'folderRules.add': 'ルールを追加',
+  'folderRules.choose': 'フォルダを選択',
+  'folderRules.valuePlaceholder': '番号付け（例: A.1 または off）',
+  'folderRules.show.inherit': '画面上の番号: 設定に従う',
+  'folderRules.show.on': '画面上の番号: オン',
+  'folderRules.show.off': '画面上の番号: オフ',
+  'folderRules.missing': 'フォルダが見つかりません',
+  'folderRules.delete': 'ルールを削除',
+  'folderRules.up': '上へ',
+  'folderRules.down': '下へ',
 };
 
 export default ja;

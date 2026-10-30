@@ -76,6 +76,23 @@ const ru: Messages = {
   'setting.updateLinks.name': 'Обновлять ссылки в других заметках',
   'setting.updateLinks.desc':
     'Когда заголовок получает новый номер, переписывает ссылки на него в остальном хранилище, чтобы они продолжали работать. Ссылки внутри самой заметки обновляются всегда.',
+  'command.addFolderRule': 'Добавить правило нумерации для папки этой заметки',
+  'notice.folderOff': 'Правило папки {folder} отключает нумерацию, поэтому заголовки этой заметки не тронуты.',
+  'setting.folderRules.name': 'Правила для папок',
+  'setting.folderRules.desc': 'Задайте папке собственную нумерацию. Правило записывается как свойство «number headings» заметки (A.1, _.1.1, off, ...). Побеждает самая глубокая папка, а свойство заметки сильнее любого правила.',
+  'setting.folderRules.button': 'Изменить правила',
+  'folderRules.title': 'Правила для папок',
+  'folderRules.empty': 'Правил для папок пока нет.',
+  'folderRules.add': 'Добавить правило',
+  'folderRules.choose': 'Выбрать папку',
+  'folderRules.valuePlaceholder': 'Нумерация, например A.1 или off',
+  'folderRules.show.inherit': 'Номера на экране: по настройке',
+  'folderRules.show.on': 'Номера на экране: вкл.',
+  'folderRules.show.off': 'Номера на экране: выкл.',
+  'folderRules.missing': 'папка не найдена',
+  'folderRules.delete': 'Удалить правило',
+  'folderRules.up': 'Вверх',
+  'folderRules.down': 'Вниз',
 };
 
 export default ru;

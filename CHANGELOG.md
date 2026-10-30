@@ -4,6 +4,11 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.9.0
+
+- New: **Folder rules.** Give a folder its own numbering, written like a note's `number headings` property (`A.1`, `_.1.1`, `off`, templates…). The deepest matching folder wins and a note's own property still wins over any rule. A rule can also turn the shown numbers on or off for its folder, and it follows the folder when you rename or move it.
+- New command: **Add a numbering rule for this note's folder**.
+
 ## 0.8.2
 
 - Heading numbers now show in the Outline on Obsidian 1.4 too.

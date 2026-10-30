@@ -99,6 +99,7 @@ Block references (`#^id`) are not headings and are never touched.
 | Insert live table of contents | Adds a table of contents block that keeps itself up to date. |
 | Copy this note with heading numbers | Copies the note with the numbers written in, leaving the note as it is. |
 | Save numbering settings to this note's properties | Writes the plugin's current settings into the note's `number headings` property, so the note keeps numbering this way whatever the settings become. |
+| Add a numbering rule for this note's folder | Gives the note's folder a rule that holds the plugin's current settings, and opens the folder rules to edit it. |
 
 None has a hotkey by default; assign one in **Settings → Hotkeys**.
 
@@ -213,6 +214,27 @@ An existing `contents ^id` part is kept; the rest is replaced. `first-level
 auto` is our own spelling for "the shallowest heading"; Number Headings
 ignores it. The property only applies while **Follow Number Headings
 properties** is on.
+
+### Folder rules
+
+A folder can have numbering of its own. **Settings → Section Numbering → Folder
+rules** lists the rules; each one is a folder, a value, and whether numbers are
+drawn on screen for it. The value is written exactly like a note's `number
+headings` property, so you can copy one to the other:
+
+| Folder | Value | Show numbers |
+|---|---|---|
+| `Papers` | `A.1.` | as set |
+| `Papers/Drafts` | `off` | as set |
+| `Manual` | `template-level-1 "Chapter {n}."` | on |
+
+The deepest folder that holds a note wins, a note's own `number headings`
+property wins over any rule, and the rule wins over the plugin's settings. A
+rule that is `off` leaves its notes alone unless a note has a property of its
+own. Leave the value empty to change only whether numbers are drawn. A rule
+follows its folder when you rename or move it, and moving a note to another
+folder numbers it by that folder's rule. Rules need no network access and
+change no note by themselves.
 
 ### Why the default separator is a dot
 

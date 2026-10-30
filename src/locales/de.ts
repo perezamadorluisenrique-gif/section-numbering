@@ -76,6 +76,23 @@ const de: Messages = {
   'setting.updateLinks.name': 'Links in anderen Notizen aktualisieren',
   'setting.updateLinks.desc':
     'Wenn eine Überschrift neu nummeriert wird, schreibt dies die Links darauf im Rest des Vaults um, damit sie weiter funktionieren. Links innerhalb der Notiz selbst werden immer aktualisiert.',
+  'command.addFolderRule': 'Nummerierungsregel für den Ordner dieser Notiz hinzufügen',
+  'notice.folderOff': 'Die Ordnerregel für {folder} schaltet die Nummerierung aus, daher wurden die Überschriften dieser Notiz nicht angetastet.',
+  'setting.folderRules.name': 'Ordnerregeln',
+  'setting.folderRules.desc': 'Gib einem Ordner eine eigene Nummerierung. Eine Regel wird wie die Eigenschaft „number headings“ einer Notiz geschrieben (A.1, _.1.1, off, ...). Der tiefste Ordner gewinnt, und die Eigenschaft der Notiz schlägt jede Regel.',
+  'setting.folderRules.button': 'Regeln bearbeiten',
+  'folderRules.title': 'Ordnerregeln',
+  'folderRules.empty': 'Noch keine Ordnerregeln.',
+  'folderRules.add': 'Regel hinzufügen',
+  'folderRules.choose': 'Ordner wählen',
+  'folderRules.valuePlaceholder': 'Nummerierung, z. B. A.1 oder off',
+  'folderRules.show.inherit': 'Nummern am Bildschirm: wie eingestellt',
+  'folderRules.show.on': 'Nummern am Bildschirm: an',
+  'folderRules.show.off': 'Nummern am Bildschirm: aus',
+  'folderRules.missing': 'Ordner nicht gefunden',
+  'folderRules.delete': 'Regel löschen',
+  'folderRules.up': 'Nach oben',
+  'folderRules.down': 'Nach unten',
 };
 
 export default de;

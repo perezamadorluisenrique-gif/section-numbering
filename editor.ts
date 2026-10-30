@@ -31,7 +31,7 @@ class NumberWidget extends WidgetType {
  * the settings do; the plugin then calls `workspace.updateOptions()`, which
  * reaches every editor, and the numbers are worked out again.
  */
-export function shownNumbersExtension(numbersFor: (text: string) => ShownNumber[], version: () => number) {
+export function shownNumbersExtension(numbersFor: (text: string, path: string) => ShownNumber[], version: () => number, pathOf: (view: EditorView) => string) {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
@@ -52,7 +52,8 @@ export function shownNumbersExtension(numbersFor: (text: string) => ShownNumber[
       build(view: EditorView): DecorationSet {
         const builder = new RangeSetBuilder<Decoration>();
         const length = view.state.doc.length;
-        for (const { heading, number } of numbersFor(view.state.doc.toString())) {
+        const path = pathOf(view);
+        for (const { heading, number } of numbersFor(view.state.doc.toString(), path)) {
           if (heading.from > length) break;
           builder.add(heading.from, heading.from, Decoration.widget({ widget: new NumberWidget(number), side: -1 }));
         }
