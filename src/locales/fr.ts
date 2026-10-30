@@ -76,6 +76,23 @@ const fr: Messages = {
   'setting.updateLinks.name': 'Mettre à jour les liens dans les autres notes',
   'setting.updateLinks.desc':
     'Lorsqu’un titre est renuméroté, réécrit les liens qui y mènent dans le reste du coffre pour qu’ils continuent de fonctionner. Les liens dans la note elle-même sont toujours mis à jour.',
+  'command.addFolderRule': 'Ajouter une règle de numérotation pour le dossier de cette note',
+  'notice.folderOff': 'La règle du dossier {folder} désactive la numérotation ; les titres de cette note n’ont donc pas été touchés.',
+  'setting.folderRules.name': 'Règles par dossier',
+  'setting.folderRules.desc': 'Donnez à un dossier sa propre numérotation. Une règle s’écrit comme la propriété « number headings » d’une note (A.1, _.1.1, off, ...). Le dossier le plus profond l’emporte, et la propriété de la note l’emporte sur toute règle.',
+  'setting.folderRules.button': 'Modifier les règles',
+  'folderRules.title': 'Règles par dossier',
+  'folderRules.empty': 'Aucune règle par dossier pour l’instant.',
+  'folderRules.add': 'Ajouter une règle',
+  'folderRules.choose': 'Choisir un dossier',
+  'folderRules.valuePlaceholder': 'Numérotation, p. ex. A.1 ou off',
+  'folderRules.show.inherit': 'Numéros à l’écran : selon le réglage',
+  'folderRules.show.on': 'Numéros à l’écran : oui',
+  'folderRules.show.off': 'Numéros à l’écran : non',
+  'folderRules.missing': 'dossier introuvable',
+  'folderRules.delete': 'Supprimer la règle',
+  'folderRules.up': 'Monter',
+  'folderRules.down': 'Descendre',
 };
 
 export default fr;

@@ -1,10 +1,10 @@
-import { App, Editor, ItemView, MarkdownRenderChild, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, Editor, FuzzySuggestModal, ItemView, MarkdownRenderChild, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, editorInfoField } from 'obsidian';
 import type { MarkdownPostProcessorContext, SettingDefinitionItem, View } from 'obsidian';
 
 import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
 
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
-import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, mergeNoteSettings, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
+import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, noteSettings, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
 import { retargetLinks } from './src/links.ts';
 import { LIVE_CONTENTS_LANGUAGE, headingLink, liveContentsEntries, newLiveBlock, parseLiveOptions } from './src/live.ts';
 import type { Edit } from './src/markdown.ts';
@@ -13,6 +13,8 @@ import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, pl
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
 import { t } from './src/i18n.ts';
 import { outlineLabels } from './src/outline.ts';
+import { normalizeFolder, renameRules, resolveSettings, ruleFor, ruleTemplates } from './src/rules.ts';
+import type { FolderRule } from './src/rules.ts';
 import type { OutlineHeading } from './src/outline.ts';
 
 interface SectionNumberingSettings extends NumberingSettings {
@@ -24,6 +26,8 @@ interface SectionNumberingSettings extends NumberingSettings {
   showNumbers: boolean;
   /** Also draw the shown numbers in the core Outline pane. */
   showInOutline: boolean;
+  /** Numbering of its own for every note under a folder. */
+  folderRules: FolderRule[];
 }
 
 const DEFAULT_SETTINGS: SectionNumberingSettings = {
@@ -34,6 +38,7 @@ const DEFAULT_SETTINGS: SectionNumberingSettings = {
   readFrontMatter: true,
   showNumbers: false,
   showInOutline: true,
+  folderRules: [],
 };
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
@@ -44,7 +49,7 @@ export default class SectionNumberingPlugin extends Plugin {
   private version = 0;
   private liveBlocks = new Set<LiveContents>();
   /** The last note text whose shown numbers were worked out, for reading view. */
-  private shownCache: { text: string; byLine: Map<number, string> } | null = null;
+  private shownCache: { text: string; path: string; byLine: Map<number, string> } | null = null;
   private outline = new OutlineNumbers(this);
 
   async onload() {
@@ -52,8 +57,9 @@ export default class SectionNumberingPlugin extends Plugin {
 
     this.registerEditorExtension(
       shownNumbersExtension(
-        (text) => this.numbersToShow(text),
+        (text, path) => this.numbersToShow(text, path),
         () => this.version,
+        (view) => view.state.field(editorInfoField, false)?.file?.path ?? '',
       ),
     );
     this.registerMarkdownPostProcessor((el, ctx) => this.numberReadingView(el, ctx));
@@ -109,9 +115,9 @@ export default class SectionNumberingPlugin extends Plugin {
       id: 'copy-with-numbers',
       name: t('command.copyWithNumbers'),
       icon: 'clipboard-copy',
-      editorCallback: (editor) => {
+      editorCallback: (editor, ctx) => {
         const text = editor.getValue();
-        const settings = this.settingsFor(text);
+        const settings = this.settingsFor(text, ctx.file?.path ?? '');
         if (!settings) return;
         const numbered = applyEdits(text, planNumbering(text, settings).edits);
         navigator.clipboard.writeText(numbered).then(
@@ -126,7 +132,7 @@ export default class SectionNumberingPlugin extends Plugin {
       name: t('command.numberHeadings'),
       icon: 'list-ordered',
       editorCallback: (editor, ctx) => {
-        const settings = this.settingsFor(editor.getValue());
+        const settings = this.settingsFor(editor.getValue(), ctx.file?.path ?? '');
         if (settings) void this.apply(editor, ctx.file, planNumbering(editor.getValue(), settings), 'numbered');
       },
     });
@@ -135,7 +141,7 @@ export default class SectionNumberingPlugin extends Plugin {
       name: t('command.removeNumbers'),
       icon: 'list-x',
       editorCallback: (editor, ctx) => {
-        const settings = this.settingsFor(editor.getValue());
+        const settings = this.settingsFor(editor.getValue(), ctx.file?.path ?? '');
         if (settings) void this.apply(editor, ctx.file, planRemoval(editor.getValue(), settings), 'removed');
       },
     });
@@ -144,9 +150,9 @@ export default class SectionNumberingPlugin extends Plugin {
       id: 'table-of-contents',
       name: t('command.tableOfContents'),
       icon: 'list-tree',
-      editorCallback: (editor) => {
+      editorCallback: (editor, ctx) => {
         const text = editor.getValue();
-        const settings = this.settingsFor(text);
+        const settings = this.settingsFor(text, ctx.file?.path ?? '');
         if (!settings) return;
         const anchor = this.anchorFor(text);
         if (hasContents(text, anchor)) {
@@ -183,6 +189,34 @@ export default class SectionNumberingPlugin extends Plugin {
         return true;
       },
     });
+
+    this.addCommand({
+      id: 'add-folder-rule',
+      name: t('command.addFolderRule'),
+      icon: 'folder-cog',
+      editorCheckCallback: (checking, _editor, ctx) => {
+        const file = ctx.file;
+        if (!file) return false;
+        if (!checking) void this.addFolderRule(file);
+        return true;
+      },
+    });
+
+    // A renamed or moved folder takes its rules along; a moved note is
+    // numbered by its new folder's rule.
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => {
+        if (file instanceof TFolder) {
+          const next = renameRules(this.settings.folderRules, oldPath, file.path);
+          if (next.some((rule, i) => rule !== this.settings.folderRules[i])) {
+            this.settings.folderRules = next;
+            void this.saveSettings();
+            return;
+          }
+        }
+        if (file instanceof TFile && file.extension === 'md') this.redraw();
+      }),
+    );
 
     this.addSettingTab(new SectionNumberingSettingTab(this.app, this));
   }
@@ -225,6 +259,21 @@ export default class SectionNumberingPlugin extends Plugin {
     }
   }
 
+  /**
+   * Gives the note's folder a rule that holds the plugin's current settings,
+   * unless it has one, and opens the settings to edit it.
+   */
+  private async addFolderRule(file: TFile): Promise<void> {
+    const folder = normalizeFolder(file.parent?.path ?? '');
+    if (!this.settings.folderRules.some((rule) => normalizeFolder(rule.folder) === folder)) {
+      const s = this.settings;
+      const value = settingsToValue({ ...s }, null);
+      this.settings.folderRules = [...s.folderRules, { folder, value }];
+      await this.saveSettings();
+    }
+    new FolderRulesModal(this.app, this).open();
+  }
+
   /** The block id the table of contents follows: the note's own, or `^toc`. */
   private anchorFor(text: string): string {
     return (this.settings.readFrontMatter && contentsAnchor(text)) || DEFAULT_ANCHOR;
@@ -235,28 +284,35 @@ export default class SectionNumberingPlugin extends Plugin {
    * `number headings` front matter over them. Null, after saying why, when
    * the note asks to be left alone.
    */
-  private settingsFor(text: string, quiet = false): NumberingSettings | null {
-    if (!this.settings.readFrontMatter) return this.settings;
-    const own = noteSettings(text);
-    if (own === null) return this.settings;
-    if (own.off) {
-      if (!quiet) new Notice(t('notice.noteOff'));
-      return null;
+  private settingsFor(text: string, path: string, quiet = false): NumberingSettings | null {
+    const rule = ruleFor(path, this.settings.folderRules);
+    const own = this.settings.readFrontMatter ? noteSettings(text) : null;
+    const settings = resolveSettings(this.settings, rule, own);
+    if (!settings && !quiet) {
+      const folder = rule ? normalizeFolder(rule.folder) : '';
+      const ruleOff = rule !== null && own === null;
+      new Notice(ruleOff ? t('notice.folderOff', { folder: folder === '' ? '/' : folder }) : t('notice.noteOff'));
     }
-    return mergeNoteSettings(this.settings, own.settings);
+    return settings;
   }
 
   /** The numbers to draw for a note's text: none unless showing is on and the note allows it. */
-  numbersToShow(text: string): ShownNumber[] {
-    if (!this.settings.showNumbers) return [];
-    const settings = this.settingsFor(text, true);
+  numbersToShow(text: string, path: string): ShownNumber[] {
+    if (!this.showsNumbers(path)) return [];
+    const settings = this.settingsFor(text, path, true);
     return settings ? shownNumbers(text, settings) : [];
   }
 
+  /** Whether numbers are drawn for a note: its folder's rule says so, or else the plugin's setting does. */
+  showsNumbers(path: string): boolean {
+    const show = ruleFor(path, this.settings.folderRules)?.show;
+    return show === 'on' || (show !== 'off' && this.settings.showNumbers);
+  }
+
   /** The live table of contents' entries for a note's text. */
-  liveEntries(text: string, source: string) {
-    const settings = this.settingsFor(text, true) ?? this.settings;
-    return liveContentsEntries(text, settings, parseLiveOptions(source), this.numbersToShow(text).length > 0);
+  liveEntries(text: string, source: string, path: string) {
+    const settings = this.settingsFor(text, path, true) ?? this.settings;
+    return liveContentsEntries(text, settings, parseLiveOptions(source), this.numbersToShow(text, path).length > 0);
   }
 
   addLiveBlock(block: LiveContents) {
@@ -274,15 +330,15 @@ export default class SectionNumberingPlugin extends Plugin {
    * (an embed, a hover preview), nothing is drawn: the line would be a guess.
    */
   private numberReadingView(el: HTMLElement, ctx: MarkdownPostProcessorContext): void {
-    if (!this.settings.showNumbers) return;
     const headings = el.querySelectorAll('h1, h2, h3, h4, h5, h6');
     if (headings.length === 0) return;
+    if (!this.showsNumbers(ctx.sourcePath)) return;
     const info = ctx.getSectionInfo(el);
     if (!info) return;
-    if (this.shownCache?.text !== info.text) {
+    if (this.shownCache?.text !== info.text || this.shownCache.path !== ctx.sourcePath) {
       const byLine = new Map<number, string>();
-      for (const { heading, number } of this.numbersToShow(info.text)) byLine.set(heading.line, number);
-      this.shownCache = { text: info.text, byLine };
+      for (const { heading, number } of this.numbersToShow(info.text, ctx.sourcePath)) byLine.set(heading.line, number);
+      this.shownCache = { text: info.text, path: ctx.sourcePath, byLine };
     }
     const number = this.shownCache.byLine.get(info.lineStart);
     if (number === undefined) return;
@@ -308,6 +364,14 @@ export default class SectionNumberingPlugin extends Plugin {
     // edited by hand, so it is merged over the defaults rather than trusted.
     const stored = (await this.loadData()) as Partial<SectionNumberingSettings> | null;
     this.settings = { ...DEFAULT_SETTINGS, ...stored };
+    this.settings.folderRules = cleanRules(this.settings.folderRules);
+  }
+
+  /** Stores the folder rules, and remembers the templates they write so renumbering a moved note stays clean. */
+  async setFolderRules(rules: FolderRule[]): Promise<void> {
+    this.settings.folderRules = rules;
+    this.settings.knownTemplates = ruleTemplates(rules, this.settings.knownTemplates ?? []);
+    await this.saveSettings();
   }
 
   async saveSettings() {
@@ -327,7 +391,7 @@ export default class SectionNumberingPlugin extends Plugin {
     const text = editor.getValue();
     // The table of contents, if the note has one, follows the headings as
     // they will be after this edit, in the same transaction.
-    const settings = this.settingsFor(text) ?? this.settings;
+    const settings = this.settingsFor(text, file?.path ?? '', true) ?? this.settings;
     const contents = updateContents(text, applyEdits(text, plan.edits), settings, this.anchorFor(text));
     if (plan.changed === 0) {
       if (contents) {
@@ -466,7 +530,7 @@ class LiveContents extends MarkdownRenderChild {
   draw(text: string): void {
     const el = this.containerEl;
     el.empty();
-    const entries = this.plugin.liveEntries(text, this.source);
+    const entries = this.plugin.liveEntries(text, this.source, this.sourcePath);
     if (entries.length === 0) {
       el.createDiv({ cls: 'section-numbering-contents-empty', text: t('contents.empty') });
       return;
@@ -487,6 +551,146 @@ class LiveContents extends MarkdownRenderChild {
       const href = headingLink(entry.heading);
       lastItem.createEl('a', { cls: 'internal-link', text: entry.label, href, attr: { 'data-href': href } });
     }
+  }
+}
+
+/** Stored rules come from disk, so only well-formed ones are kept. */
+function cleanRules(stored: unknown): FolderRule[] {
+  if (!Array.isArray(stored)) return [];
+  const rules: FolderRule[] = [];
+  for (const item of stored as unknown[]) {
+    const rule = item as Partial<FolderRule> | null;
+    if (!rule || typeof rule.folder !== 'string' || typeof rule.value !== 'string') continue;
+    const show = rule.show === 'on' || rule.show === 'off' ? rule.show : 'inherit';
+    rules.push({ folder: normalizeFolder(rule.folder), value: rule.value, show });
+  }
+  return rules;
+}
+
+/** Picks one folder of the vault, the root included. */
+class FolderPicker extends FuzzySuggestModal<TFolder> {
+  constructor(app: App, private onPick: (folder: TFolder) => void) {
+    super(app);
+  }
+
+  getItems(): TFolder[] {
+    return this.app.vault.getAllLoadedFiles().filter((file): file is TFolder => file instanceof TFolder);
+  }
+
+  getItemText(folder: TFolder): string {
+    return folder.path === '/' ? '/' : folder.path;
+  }
+
+  onChooseItem(folder: TFolder): void {
+    this.onPick(folder);
+  }
+}
+
+/** The folder rules: one row each, edited in place and saved as they change. */
+class FolderRulesModal extends Modal {
+  private timer: number | null = null;
+
+  constructor(app: App, private plugin: SectionNumberingPlugin) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.titleEl.setText(t('folderRules.title'));
+    this.draw();
+  }
+
+  onClose(): void {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.contentEl.empty();
+  }
+
+  private rules(): FolderRule[] {
+    return this.plugin.settings.folderRules;
+  }
+
+  /** Saves the rules a moment after the last keystroke, so typing does not redraw every note each time. */
+  private later(rules: FolderRule[]): void {
+    this.plugin.settings.folderRules = rules;
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => {
+      this.timer = null;
+      void this.plugin.setFolderRules(this.plugin.settings.folderRules);
+    }, 400);
+  }
+
+  private async now(rules: FolderRule[]): Promise<void> {
+    if (this.timer !== null) window.clearTimeout(this.timer);
+    this.timer = null;
+    await this.plugin.setFolderRules(rules);
+    this.draw();
+  }
+
+  private draw(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    const rules = this.rules();
+    if (rules.length === 0) contentEl.createEl('p', { text: t('folderRules.empty'), cls: 'setting-item-description' });
+    rules.forEach((rule, index) => {
+      const row = new Setting(contentEl);
+      const exists = rule.folder === '' || this.app.vault.getAbstractFileByPath(rule.folder) instanceof TFolder;
+      row.setDesc(exists ? '' : `${rule.folder}: ${t('folderRules.missing')}`);
+      row.addText((text) =>
+        text
+          .setPlaceholder('/')
+          .setValue(rule.folder)
+          .onChange((value) => {
+            const next = rules.map((r, i) => (i === index ? { ...r, folder: normalizeFolder(value) } : r));
+            this.later(next);
+          }),
+      );
+      row.addExtraButton((button) =>
+        button.setIcon('folder-search').setTooltip(t('folderRules.choose')).onClick(() => {
+          new FolderPicker(this.app, (folder) => {
+            const path = folder.path === '/' ? '' : folder.path;
+            void this.now(rules.map((r, i) => (i === index ? { ...r, folder: path } : r)));
+          }).open();
+        }),
+      );
+      row.addText((text) =>
+        text
+          .setPlaceholder(t('folderRules.valuePlaceholder'))
+          .setValue(rule.value)
+          .onChange((value) => this.later(rules.map((r, i) => (i === index ? { ...r, value } : r)))),
+      );
+      row.addDropdown((dropdown) =>
+        dropdown
+          .addOptions({
+            inherit: t('folderRules.show.inherit'),
+            on: t('folderRules.show.on'),
+            off: t('folderRules.show.off'),
+          })
+          .setValue(rule.show ?? 'inherit')
+          .onChange((value) => {
+            const show = value === 'on' || value === 'off' ? value : 'inherit';
+            void this.now(rules.map((r, i) => (i === index ? { ...r, show } : r)));
+          }),
+      );
+      row.addExtraButton((button) =>
+        button.setIcon('arrow-up').setTooltip(t('folderRules.up')).setDisabled(index === 0).onClick(() => {
+          const next = [...rules];
+          [next[index - 1], next[index]] = [next[index], next[index - 1]];
+          void this.now(next);
+        }),
+      );
+      row.addExtraButton((button) =>
+        button.setIcon('arrow-down').setTooltip(t('folderRules.down')).setDisabled(index === rules.length - 1).onClick(() => {
+          const next = [...rules];
+          [next[index + 1], next[index]] = [next[index], next[index + 1]];
+          void this.now(next);
+        }),
+      );
+      row.addExtraButton((button) =>
+        button.setIcon('trash').setTooltip(t('folderRules.delete')).onClick(() => void this.now(rules.filter((_, i) => i !== index))),
+      );
+    });
+    new Setting(contentEl).addButton((button) =>
+      button.setButtonText(t('folderRules.add')).setCta().onClick(() => void this.now([...rules, { folder: '', value: '', show: 'inherit' }])),
+    );
   }
 }
 
@@ -522,7 +726,8 @@ class OutlineNumbers {
   constructor(private plugin: SectionNumberingPlugin) {}
 
   private enabled(): boolean {
-    return this.plugin.settings.showNumbers && this.plugin.settings.showInOutline;
+    const settings = this.plugin.settings;
+    return settings.showInOutline && (settings.showNumbers || settings.folderRules.some((rule) => rule.show === 'on'));
   }
 
   /** Starts or stops watching every open Outline pane, and redraws their numbers soon. */
@@ -578,7 +783,7 @@ class OutlineNumbers {
     if (!rows) return this.draw(view, []);
     const labels = outlineLabels(
       rows.map((row) => row.heading),
-      this.plugin.numbersToShow(text),
+      this.plugin.numbersToShow(text, path),
     );
     this.draw(
       view,
@@ -697,7 +902,7 @@ const levelOptions = (): Record<string, string> => {
   return options;
 };
 
-type SettingKey = keyof SectionNumberingSettings;
+type SettingKey = Exclude<keyof SectionNumberingSettings, 'folderRules'>;
 
 interface SettingRow {
   key: SettingKey;
@@ -776,7 +981,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
    * versions do not know this method and call `display()` instead.
    */
   getSettingDefinitions(): SettingDefinitionItem[] {
-    return settingRows().map((row) => ({
+    const rows: SettingDefinitionItem[] = settingRows().map((row) => ({
       name: row.name,
       desc: row.desc,
       control: row.text
@@ -785,6 +990,12 @@ class SectionNumberingSettingTab extends PluginSettingTab {
         ? { type: 'dropdown' as const, key: row.key, options: row.options, defaultValue: String(DEFAULT_SETTINGS[row.key]) }
         : { type: 'toggle' as const, key: row.key, defaultValue: DEFAULT_SETTINGS[row.key] as boolean },
     }));
+    rows.push({
+      name: t('setting.folderRules.name'),
+      desc: t('setting.folderRules.desc'),
+      action: () => new FolderRulesModal(this.app, this.plugin).open(),
+    });
+    return rows;
   }
 
   getControlValue(key: string): unknown {
@@ -837,5 +1048,10 @@ class SectionNumberingSettingTab extends PluginSettingTab {
         });
       }
     }
+
+    new Setting(containerEl)
+      .setName(t('setting.folderRules.name'))
+      .setDesc(t('setting.folderRules.desc'))
+      .addButton((button) => button.setButtonText(t('setting.folderRules.button')).onClick(() => new FolderRulesModal(this.app, this.plugin).open()));
   }
 }

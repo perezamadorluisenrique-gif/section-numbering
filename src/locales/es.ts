@@ -76,6 +76,23 @@ const es: Messages = {
   'setting.updateLinks.name': 'Actualizar los enlaces de otras notas',
   'setting.updateLinks.desc':
     'Cuando un encabezado cambia de número, reescribe los enlaces que apuntan a él en el resto de la bóveda para que sigan funcionando. Los enlaces dentro de la propia nota siempre se actualizan.',
+  'command.addFolderRule': 'Añadir una regla de numeración para la carpeta de esta nota',
+  'notice.folderOff': 'La regla de la carpeta {folder} desactiva la numeración, así que los encabezados de esta nota se dejaron como estaban.',
+  'setting.folderRules.name': 'Reglas por carpeta',
+  'setting.folderRules.desc': 'Da a una carpeta su propia numeración. Una regla se escribe como la propiedad "number headings" de una nota (A.1, _.1.1, off, ...). Gana la carpeta más profunda, y la propiedad de la nota gana a cualquier regla.',
+  'setting.folderRules.button': 'Editar reglas',
+  'folderRules.title': 'Reglas por carpeta',
+  'folderRules.empty': 'Aún no hay reglas por carpeta.',
+  'folderRules.add': 'Añadir regla',
+  'folderRules.choose': 'Elegir carpeta',
+  'folderRules.valuePlaceholder': 'Numeración, p. ej. A.1 u off',
+  'folderRules.show.inherit': 'Números en pantalla: según el ajuste',
+  'folderRules.show.on': 'Números en pantalla: sí',
+  'folderRules.show.off': 'Números en pantalla: no',
+  'folderRules.missing': 'carpeta no encontrada',
+  'folderRules.delete': 'Borrar regla',
+  'folderRules.up': 'Subir',
+  'folderRules.down': 'Bajar',
 };
 
 export default es;

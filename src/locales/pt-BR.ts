@@ -76,6 +76,23 @@ const ptBR: Messages = {
   'setting.updateLinks.name': 'Atualizar links em outras notas',
   'setting.updateLinks.desc':
     'Quando um título é renumerado, reescreve os links para ele no restante do cofre para que continuem funcionando. Os links dentro da própria nota são sempre atualizados.',
+  'command.addFolderRule': 'Adicionar uma regra de numeração para a pasta desta nota',
+  'notice.folderOff': 'A regra da pasta {folder} desativa a numeração, então os títulos desta nota foram deixados como estavam.',
+  'setting.folderRules.name': 'Regras por pasta',
+  'setting.folderRules.desc': 'Dê a uma pasta a sua própria numeração. Uma regra é escrita como a propriedade "number headings" de uma nota (A.1, _.1.1, off, ...). Vence a pasta mais profunda, e a propriedade da nota vence qualquer regra.',
+  'setting.folderRules.button': 'Editar regras',
+  'folderRules.title': 'Regras por pasta',
+  'folderRules.empty': 'Ainda não há regras por pasta.',
+  'folderRules.add': 'Adicionar regra',
+  'folderRules.choose': 'Escolher pasta',
+  'folderRules.valuePlaceholder': 'Numeração, p. ex. A.1 ou off',
+  'folderRules.show.inherit': 'Números na tela: conforme o ajuste',
+  'folderRules.show.on': 'Números na tela: ligados',
+  'folderRules.show.off': 'Números na tela: desligados',
+  'folderRules.missing': 'pasta não encontrada',
+  'folderRules.delete': 'Excluir regra',
+  'folderRules.up': 'Subir',
+  'folderRules.down': 'Descer',
 };
 
 export default ptBR;

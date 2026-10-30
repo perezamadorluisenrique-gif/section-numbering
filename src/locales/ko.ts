@@ -74,6 +74,23 @@ const ko: Messages = {
     'Number Headings 플러그인이 쓰는 방식으로 속성에 "number headings" 항목이 있는 노트는 그 항목이 말하는 대로 번호가 매겨지며, "number headings: off"는 노트를 그대로 둡니다.',
   'setting.updateLinks.name': '다른 노트의 링크 업데이트',
   'setting.updateLinks.desc': '제목 번호가 바뀌면 보관함의 다른 노트에 있는 해당 링크를 다시 써서 계속 동작하게 합니다. 이 노트 안의 링크는 항상 업데이트됩니다.',
+  'command.addFolderRule': '이 노트의 폴더에 번호 매기기 규칙 추가',
+  'notice.folderOff': '{folder} 폴더 규칙이 번호 매기기를 끄므로 이 노트의 제목은 건드리지 않았습니다.',
+  'setting.folderRules.name': '폴더 규칙',
+  'setting.folderRules.desc': '폴더에 고유한 번호 매기기를 지정합니다. 규칙은 노트의 "number headings" 속성과 같은 형식으로 씁니다 (A.1, _.1.1, off 등). 가장 깊은 폴더가 우선하며, 노트 자체의 속성은 모든 규칙보다 우선합니다.',
+  'setting.folderRules.button': '규칙 편집',
+  'folderRules.title': '폴더 규칙',
+  'folderRules.empty': '아직 폴더 규칙이 없습니다.',
+  'folderRules.add': '규칙 추가',
+  'folderRules.choose': '폴더 선택',
+  'folderRules.valuePlaceholder': '번호 매기기 (예: A.1 또는 off)',
+  'folderRules.show.inherit': '화면 번호: 설정에 따름',
+  'folderRules.show.on': '화면 번호: 켜짐',
+  'folderRules.show.off': '화면 번호: 꺼짐',
+  'folderRules.missing': '폴더를 찾을 수 없음',
+  'folderRules.delete': '규칙 삭제',
+  'folderRules.up': '위로',
+  'folderRules.down': '아래로',
 };
 
 export default ko;

@@ -158,7 +158,14 @@ export function mergeNoteSettings(base: NumberingSettings, own: Partial<Numberin
 /** The note's own settings, or null when its front matter has no `number headings` key. */
 export function noteSettings(text: string): NoteSettings | null {
   const value = frontMatterValue(text);
-  if (value === null) return null;
+  return value === null ? null : parseNumberingValue(value);
+}
+
+/**
+ * What a `number headings` value says: the same text a note's property holds,
+ * and the form a folder rule is written in.
+ */
+export function parseNumberingValue(value: string): NoteSettings {
   const settings: Partial<NumberingSettings> = { separator: '', topTemplate: DEFAULT_TEMPLATE, otherTemplate: DEFAULT_TEMPLATE };
   let skipTop = false;
 

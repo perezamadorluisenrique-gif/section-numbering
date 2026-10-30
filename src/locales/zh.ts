@@ -69,6 +69,23 @@ const zh: Messages = {
     '属性中带有 "number headings" 条目（如 Number Headings 插件所写）的笔记，会按该条目所述方式编号，而 "number headings: off" 会让笔记保持原样。',
   'setting.updateLinks.name': '更新其他笔记中的链接',
   'setting.updateLinks.desc': '标题重新编号后，改写整个仓库中指向它的链接，使其保持有效。本笔记内部的链接始终会更新。',
+  'command.addFolderRule': '为此笔记所在文件夹添加编号规则',
+  'notice.folderOff': '文件夹 {folder} 的规则关闭了编号，因此此笔记的标题未做改动。',
+  'setting.folderRules.name': '文件夹规则',
+  'setting.folderRules.desc': '为文件夹设置专属编号。规则的写法与笔记的 "number headings" 属性相同（A.1、_.1.1、off 等）。最深层的文件夹优先，笔记自身的属性优先于任何规则。',
+  'setting.folderRules.button': '编辑规则',
+  'folderRules.title': '文件夹规则',
+  'folderRules.empty': '还没有文件夹规则。',
+  'folderRules.add': '添加规则',
+  'folderRules.choose': '选择文件夹',
+  'folderRules.valuePlaceholder': '编号，例如 A.1 或 off',
+  'folderRules.show.inherit': '屏幕上的编号：按设置',
+  'folderRules.show.on': '屏幕上的编号：开',
+  'folderRules.show.off': '屏幕上的编号：关',
+  'folderRules.missing': '未找到文件夹',
+  'folderRules.delete': '删除规则',
+  'folderRules.up': '上移',
+  'folderRules.down': '下移',
 };
 
 export default zh;
