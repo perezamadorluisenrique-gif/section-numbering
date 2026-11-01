@@ -302,6 +302,10 @@ Writing numbers into the text as you type is not included: rewriting links in
 other notes on every keystroke is not something a plugin should do behind your
 back. Shown numbers give you numbers that follow every edit without that.
 
+## Pro
+
+[Section Numbering Pro](https://perezamadorluisenrique-gif.github.io/pro/section-numbering/) is an optional paid companion (one-time payment, 14-day free trial) for documents that span several notes: numbering profiles, cross-references between notes that follow renumbering, figure and table numbers, and export to HTML, Pandoc and LaTeX. Everything described above stays free in this plugin.
+
 ## Installing
 
 From Obsidian: **Settings → Community plugins → Browse**, search for *Section
