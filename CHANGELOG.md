@@ -4,6 +4,10 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.10.1
+
+- Settings: a link to more plugins, the optional Pro versions and template vaults (opens a web page when clicked).
+
 ## 0.10.0
 
 - New: an API for other plugins (`app.plugins.getPlugin('section-numbering').api`, version 1): a plugin can take over the notes it numbers and hear when a note is renumbered. See *For developers* in the README.

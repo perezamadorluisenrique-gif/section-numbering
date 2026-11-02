@@ -15,6 +15,7 @@ import { applyEdits } from './src/markdown.ts';
 import { DEFAULT_NUMBERING, DEFAULT_TEMPLATE, isValidTemplate, planNumbering, planRemoval, rememberTemplates, shownNumbers } from './src/numbering.ts';
 import type { NumberStyle, NumberingSettings, Plan, Separator, ShownNumber } from './src/numbering.ts';
 import { t } from './src/i18n.ts';
+import { moreText, openMore } from './src/more-link.ts';
 import { outlineLabels } from './src/outline.ts';
 import { normalizeFolder, renameRules, ruleFor, ruleTemplates } from './src/rules.ts';
 import type { FolderRule } from './src/rules.ts';
@@ -1041,6 +1042,7 @@ class SectionNumberingSettingTab extends PluginSettingTab {
       desc: t('setting.folderRules.desc'),
       action: () => new FolderRulesModal(this.app, this.plugin).open(),
     });
+    rows.push({ name: moreText().name, desc: moreText().desc, action: () => openMore() });
     return rows;
   }
 
@@ -1099,5 +1101,10 @@ class SectionNumberingSettingTab extends PluginSettingTab {
       .setName(t('setting.folderRules.name'))
       .setDesc(t('setting.folderRules.desc'))
       .addButton((button) => button.setButtonText(t('setting.folderRules.button')).onClick(() => new FolderRulesModal(this.app, this.plugin).open()));
+
+    new Setting(containerEl)
+      .setName(moreText().name)
+      .setDesc(moreText().desc)
+      .addButton((button) => button.setButtonText(moreText().button).onClick(() => openMore()));
   }
 }
