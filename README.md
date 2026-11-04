@@ -306,6 +306,10 @@ back. Shown numbers give you numbers that follow every edit without that.
 
 [Section Numbering Pro](https://perezamadorluisenrique-gif.github.io/pro/section-numbering/) is an optional paid companion (one-time payment, 14-day free trial) for documents that span several notes: numbering profiles, cross-references between notes that follow renumbering, figure and table numbers, and export to HTML, Pandoc and LaTeX. Everything described above stays free in this plugin.
 
+## Free template
+
+[`templates/report-starter`](templates/) is a numbered report skeleton with a live table of contents. To turn notes into a book, see the free starter in [Book Studio](https://github.com/perezamadorluisenrique-gif/book-studio/tree/main/templates).
+
 ## Installing
 
 From Obsidian: **Settings → Community plugins → Browse**, search for *Section
