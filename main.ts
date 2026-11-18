@@ -420,7 +420,7 @@ export default class SectionNumberingPlugin extends Plugin {
     }
     Object.assign(this.settings, markHintShown(this.settings, 'sn-export'));
     void this.saveSettings();
-    const fragment = document.createDocumentFragment();
+    const fragment = createFragment();
     const box = fragment.createDiv();
     box.createDiv({ text: t('notice.copied') });
     const notice = new Notice(fragment, 15000);
