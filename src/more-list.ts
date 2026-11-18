@@ -2,7 +2,10 @@
 import type { MorePick } from './more-link.ts';
 
 export const PICKS: readonly MorePick[] = [
+	{ id: "book-studio", name: "Book Studio", desc: "Turn notes into a print-ready PDF and EPUB." },
 	{ id: "list-item-callouts", name: "List Item Callouts", desc: "Colour a list item as a callout." },
 	{ id: "dice-rolls", name: "Dice Rolls", desc: "Inline dice rolls you click to reroll." },
-	{ id: "folder-counts", name: "Folder Counts", desc: "Note counts on every folder in the explorer." },
 ];
+
+/** The "Pro and templates" row of the settings block, or null for none. */
+export const PRO_PAGE: string | null = 'https://perezamadorluisenrique-gif.github.io/pro/?ref=more-section-numbering';

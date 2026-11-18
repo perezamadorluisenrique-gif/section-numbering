@@ -20,8 +20,10 @@ import { normalizeFolder, renameRules, ruleFor, ruleTemplates } from './src/rule
 import type { FolderRule } from './src/rules.ts';
 import type { OutlineHeading } from './src/outline.ts';
 import { moreDefinitions, renderMore } from './src/more-link.ts';
+import { HINT_DEFAULTS, cleanHintSettings, hintDue, hintUrl, hintsOff, markHintShown, renderHint } from './src/pro-hint.ts';
+import type { HintSettings } from './src/pro-hint.ts';
 
-interface SectionNumberingSettings extends NumberingSettings {
+interface SectionNumberingSettings extends NumberingSettings, HintSettings {
   /** Rewrite links in other notes that point at a renumbered heading. */
   updateLinks: boolean;
   /** Follow a note's `number headings` front matter, as Number Headings wrote it. */
@@ -43,6 +45,8 @@ const DEFAULT_SETTINGS: SectionNumberingSettings = {
   showNumbers: false,
   showInOutline: true,
   folderRules: [],
+  ...HINT_DEFAULTS,
+  proHintShown: {},
 };
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
@@ -129,7 +133,7 @@ export default class SectionNumberingPlugin extends Plugin {
         if (!settings) return;
         const numbered = applyEdits(text, planNumbering(text, settings).edits);
         navigator.clipboard.writeText(numbered).then(
-          () => new Notice(t('notice.copied')),
+          () => this.noticeCopied(),
           () => new Notice(t('notice.clipboardFailed')),
         );
       },
@@ -401,6 +405,35 @@ export default class SectionNumberingPlugin extends Plugin {
     const stored = (await this.loadData()) as Partial<SectionNumberingSettings> | null;
     this.settings = { ...DEFAULT_SETTINGS, ...stored };
     this.settings.folderRules = cleanRules(this.settings.folderRules);
+    Object.assign(this.settings, cleanHintSettings(stored));
+  }
+
+  /**
+   * The notice "Copy with numbers" already shows. At most once every 14 days it also carries one static Pro
+   * tip (fixed text, no network); it is the only place the plugin shows one, because this command has no
+   * window of its own.
+   */
+  private noticeCopied(): void {
+    if (!hintDue(this.settings, 'sn-export')) {
+      new Notice(t('notice.copied'));
+      return;
+    }
+    Object.assign(this.settings, markHintShown(this.settings, 'sn-export'));
+    void this.saveSettings();
+    const fragment = document.createDocumentFragment();
+    const box = fragment.createDiv();
+    box.createDiv({ text: t('notice.copied') });
+    const notice = new Notice(fragment, 15000);
+    renderHint(
+      box,
+      { line: t('proHint.export'), more: t('proHint.more'), off: t('proHint.off') },
+      hintUrl('section-numbering', 'sn-export'),
+      async () => {
+        Object.assign(this.settings, hintsOff(this.settings));
+        await this.saveSettings();
+        notice.hide();
+      },
+    );
   }
 
   /** Stores the folder rules, and remembers the templates they write so renumbering a moved note stays clean. */
@@ -949,7 +982,7 @@ const levelOptions = (): Record<string, string> => {
   return options;
 };
 
-type SettingKey = Exclude<keyof SectionNumberingSettings, 'folderRules'>;
+type SettingKey = Exclude<keyof SectionNumberingSettings, 'folderRules' | 'proHintShown'>;
 
 interface SettingRow {
   key: SettingKey;
@@ -1002,6 +1035,7 @@ function settingRows(): SettingRow[] {
     },
     { key: 'readFrontMatter', name: t('setting.readFrontMatter.name'), desc: t('setting.readFrontMatter.desc') },
     { key: 'updateLinks', name: t('setting.updateLinks.name'), desc: t('setting.updateLinks.desc') },
+    { key: 'proHints', name: t('setting.proHints.name'), desc: t('setting.proHints.desc') },
   ];
 }
 
