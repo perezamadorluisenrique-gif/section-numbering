@@ -2,11 +2,15 @@ import { App, Editor, FuzzySuggestModal, ItemView, MarkdownRenderChild, Markdown
 import type { MarkdownPostProcessorContext, SettingDefinitionItem, View } from 'obsidian';
 
 import { NUMBER_CLASS, shownNumbersExtension } from './editor.ts';
+import { AUTO_USER_EVENT, autoNumberingListener, isComposing } from './auto-editor.ts';
+import type { EditorView } from '@codemirror/view';
 
 import { createExtensions } from './src/api.ts';
 import type { SectionNumberingApiV1 } from './src/api.ts';
+import { AutoScheduler, autoSource, composeRenames, hasWrittenNumbers, lineCh, liveRenames, mapSelections } from './src/auto.ts';
+import type { PassResult } from './src/auto.ts';
 import { DEFAULT_ANCHOR, hasContents, newContents, updateContents } from './src/contents.ts';
-import { FRONT_MATTER_KEY, contentsAnchor, isFrontMatterKey, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
+import { FRONT_MATTER_KEY, contentsAnchor, frontMatterValue, isFrontMatterKey, settingsToValue, valueContentsAnchor } from './src/frontmatter.ts';
 import { decideNote } from './src/guard.ts';
 import { retargetLinks } from './src/links.ts';
 import { LIVE_CONTENTS_LANGUAGE, headingLink, liveContentsEntries, newLiveBlock, parseLiveOptions } from './src/live.ts';
@@ -32,6 +36,8 @@ interface SectionNumberingSettings extends NumberingSettings {
   showInOutline: boolean;
   /** Numbering of its own for every note under a folder. */
   folderRules: FolderRule[];
+  /** Renumber notes that already carry written numbers when typing pauses. */
+  autoNumber: boolean;
 }
 
 const DEFAULT_SETTINGS: SectionNumberingSettings = {
@@ -43,6 +49,7 @@ const DEFAULT_SETTINGS: SectionNumberingSettings = {
   showNumbers: false,
   showInOutline: true,
   folderRules: [],
+  autoNumber: false,
 };
 
 const LEVELS = [1, 2, 3, 4, 5, 6] as const;
@@ -56,6 +63,13 @@ export default class SectionNumberingPlugin extends Plugin {
   private shownCache: { text: string; path: string; byLine: Map<number, string> } | null = null;
   private outline = new OutlineNumbers(this);
   private extensions = createExtensions((message, error) => console.error(message, error));
+  /** Renames made by automatic passes that links in other notes have not followed yet, by note path. */
+  private autoRenames = new Map<string, { file: TFile; renames: Map<string, string>; text: string }>();
+  private auto = new AutoScheduler<EditorView>(
+    { set: (callback, ms) => window.setTimeout(callback, ms), clear: (handle) => window.clearTimeout(handle as number) },
+    (view) => this.autoPass(view),
+    (path) => void this.flushAutoLinks(path),
+  );
   /** What other plugins use: `app.plugins.getPlugin('section-numbering').api`. Null while unloaded. */
   api: SectionNumberingApiV1 | null = null;
 
@@ -71,6 +85,16 @@ export default class SectionNumberingPlugin extends Plugin {
       ),
     );
     this.registerMarkdownPostProcessor((el, ctx) => this.numberReadingView(el, ctx));
+    this.registerEditorExtension(
+      autoNumberingListener((view, kind) => {
+        const path = view.state.field(editorInfoField, false)?.file?.path;
+        if (path) this.auto.edited(view, path, kind);
+      }),
+    );
+    // Leaving a note sends its renamed headings to the links in other notes.
+    this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.leaveOtherNotes()));
+    this.registerEvent(this.app.workspace.on('file-open', () => this.leaveOtherNotes()));
+    this.register(() => this.auto.dispose());
     this.registerMarkdownCodeBlockProcessor(LIVE_CONTENTS_LANGUAGE, (source, el, ctx) => {
       ctx.addChild(new LiveContents(this, el, source, ctx.sourcePath));
     });
@@ -442,11 +466,7 @@ export default class SectionNumberingPlugin extends Plugin {
       return;
     }
 
-    // Links inside the table of contents are rewritten with it, not here.
-    const own = (
-      file ? retargetLinks(text, plan.renames, (path) => path === '' || this.resolves(path, file.path, file)) : []
-    ).filter((edit) => !contents || edit.to <= contents.from || edit.from >= contents.to);
-    const edits = [...plan.edits, ...own, ...(contents ? [contents] : [])];
+    const edits = this.noteEdits(text, file, plan, contents);
     editor.transaction({
       changes: edits.map((edit) => ({
         from: editor.offsetToPos(edit.from),
@@ -475,6 +495,125 @@ export default class SectionNumberingPlugin extends Plugin {
     }
     new Notice(message);
     await this.rememberTemplates(settings);
+  }
+
+  /** The plan's edits, the links within the note that follow them, and the table of contents, as one list. */
+  private noteEdits(text: string, file: TFile | null, plan: Plan, contents: Edit | null): Edit[] {
+    // Links inside the table of contents are rewritten with it, not here.
+    const own = (
+      file && plan.renames.size > 0
+        ? retargetLinks(text, plan.renames, (path) => path === '' || this.resolves(path, file.path, file))
+        : []
+    ).filter((edit) => !contents || edit.to <= contents.from || edit.from >= contents.to);
+    return [...plan.edits, ...own, ...(contents ? [contents] : [])];
+  }
+
+  /**
+   * The settings to keep a note numbered with as you write, or null when it
+   * is not: nothing asks for it (`autoSource`), the note is left alone
+   * (`settingsFor`), its numbers are shown rather than written, or only the
+   * global setting asks and the note has no written numbers yet.
+   */
+  private autoSettingsFor(text: string, path: string): NumberingSettings | null {
+    const source = autoSource({
+      noteValue: this.settings.readFrontMatter ? frontMatterValue(text) : null,
+      ruleValue: ruleFor(path, this.settings.folderRules)?.value ?? null,
+      setting: this.settings.autoNumber,
+    });
+    if (!source) return null;
+    const settings = this.settingsFor(text, path, true);
+    if (!settings || this.numbersToShow(text, path).length > 0) return null;
+    if (source === 'global' && !hasWrittenNumbers(text, settings)) return null;
+    return settings;
+  }
+
+  /**
+   * One automatic pass over the note in `view`, once typing paused: the
+   * headings, the links within the note and the table of contents change in
+   * one transaction, which one undo takes back. Every caret and selection
+   * stays on the text it was on. It waits while an input method is composing
+   * or a caret is inside text it would rewrite. Links in other notes are
+   * left for `flushAutoLinks`.
+   */
+  private autoPass(view: EditorView): PassResult {
+    const info = view.state.field(editorInfoField, false);
+    const file = info?.file;
+    const editor = info?.editor;
+    if (!file || !editor || !view.dom.isConnected) return 'done';
+    const text = editor.getValue();
+    const waiting = this.autoRenames.get(file.path);
+    if (waiting) waiting.text = text;
+    const settings = this.autoSettingsFor(text, file.path);
+    if (!settings) return 'done';
+    if (isComposing(view)) return 'wait';
+
+    const plan = planNumbering(text, settings);
+    const contents = updateContents(text, applyEdits(text, plan.edits), settings, this.anchorFor(text));
+    if (plan.changed === 0 && !contents) return 'done';
+    const edits = this.noteEdits(text, file, plan, contents);
+    const selections = mapSelections(
+      editor.listSelections().map((s) => ({ anchor: editor.posToOffset(s.anchor), head: editor.posToOffset(s.head) })),
+      edits,
+    );
+    if (!selections) return 'wait';
+    const next = applyEdits(text, edits);
+    editor.transaction(
+      {
+        changes: edits.map((edit) => ({ from: editor.offsetToPos(edit.from), to: editor.offsetToPos(edit.to), text: edit.insert })),
+        selections: selections.map((s) => ({ from: lineCh(next, s.anchor), to: lineCh(next, s.head) })),
+      },
+      AUTO_USER_EVENT,
+    );
+    if (plan.renames.size > 0) {
+      const before = this.autoRenames.get(file.path)?.renames ?? new Map<string, string>();
+      this.autoRenames.set(file.path, { file, renames: composeRenames(before, plan.renames), text: next });
+      this.auto.linksPending(file.path);
+    } else if (waiting) {
+      waiting.text = next;
+    }
+    void this.rememberTemplates(settings);
+    return 'done';
+  }
+
+  /** Sends the renames of every note other than the active one to the links that point at it. */
+  private leaveOtherNotes(): void {
+    const active = this.app.workspace.getActiveFile()?.path;
+    for (const path of this.auto.pendingPaths()) if (path !== active) this.auto.left(path);
+  }
+
+  /**
+   * Rewrites links in other notes after automatic passes, in one batch: when
+   * the note is left or has been idle a while. Only renames whose new heading
+   * is still there and whose old one is gone are carried (`liveRenames`).
+   */
+  private async flushAutoLinks(path: string): Promise<void> {
+    const pending = this.autoRenames.get(path);
+    this.autoRenames.delete(path);
+    if (!pending) return;
+    const text = this.openText(pending.file.path) ?? pending.text;
+    const renames = liveRenames(pending.renames, text);
+    if (renames.size === 0) return;
+    if (this.settings.updateLinks) {
+      const { links, notes } = await this.updateLinksElsewhere(pending.file, renames);
+      if (links > 0) new Notice(linksUpdated(links, notes));
+    }
+    this.extensions.emit('renumbered', {
+      path: pending.file.path,
+      text,
+      kind: 'numbered',
+      renames: new Map(renames),
+      changed: renames.size,
+      linksUpdated: this.settings.updateLinks,
+    });
+  }
+
+  /** The text of a note open in an editor, which may be ahead of the disk. */
+  private openText(path: string): string | null {
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      const view = leaf.view;
+      if (view instanceof MarkdownView && view.file?.path === path) return view.editor.getValue();
+    }
+    return null;
   }
 
   /**
@@ -972,6 +1111,7 @@ function settingRows(): SettingRow[] {
   return [
     { key: 'showNumbers', name: t('setting.showNumbers.name'), desc: t('setting.showNumbers.desc') },
     { key: 'showInOutline', name: t('setting.showInOutline.name'), desc: t('setting.showInOutline.desc') },
+    { key: 'autoNumber', name: t('setting.autoNumber.name'), desc: t('setting.autoNumber.desc') },
     {
       key: 'firstLevel',
       name: t('setting.firstLevel.name'),

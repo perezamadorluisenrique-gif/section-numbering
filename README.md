@@ -49,6 +49,38 @@ clipboard with the numbers written in, for pasting elsewhere; the note itself
 is not changed. To keep the numbers in the file, use *Number headings in this
 note* instead.
 
+## Keep numbers up to date as you write
+
+Turn on **Keep numbers up to date as you write** (off by default) and a note
+that already has written numbers is renumbered when you stop typing for a
+moment, about a second and a half. Add `## Background` between two numbered
+sections, pause, and it reads `## 2. Background`, the sections after it move
+on by one, and the `^toc` table of contents and the links within the note
+follow, all in one edit. Your caret and selection stay on the text they were
+on, moved along by the characters put in front of them.
+
+- **Undo:** one Ctrl+Z (Cmd+Z) removes the automatic renumbering and leaves
+  what you typed. Nothing is renumbered again until you type in the note.
+- **Links in other notes** are not rewritten on every pause. They are updated
+  in one go when you leave the note, or after about ten seconds without an
+  edit, with a notice saying how many changed (switch it off with **Update
+  links in other notes**). Until then a link from another note to a heading
+  whose number just changed points at the old number.
+- **Which notes:** the setting never adds numbers to a note that has none;
+  run *Number headings in this note* once to start. A note whose `number
+  headings` property includes `auto`, as Number Headings writes it
+  (`number headings: auto, 1.1.`), is kept up to date even when the setting
+  is off, and is numbered the first time you edit it. A folder rule whose
+  value includes `auto` does the same for its notes; a note's own property
+  wins over its folder's rule.
+- **Never touched:** notes with `number headings: off` or in a folder whose
+  rule is `off`, notes another plugin numbers (`numbering profile`, such as
+  Section Numbering Pro), and notes whose numbers are shown without changing
+  the note: shown numbers already follow every edit, so nothing is written
+  there.
+- A pass waits while an input method is composing text, and while the caret
+  is inside a number it would rewrite.
+
 ## Live table of contents
 
 *Insert live table of contents* adds this block:
@@ -132,6 +164,7 @@ line ends with `^toc`: rename the label, or make it a heading such as
 |---|---|---|
 | Show numbers without changing notes | Off | Draws the numbers in front of headings without writing them. See [Show numbers without changing the note](#show-numbers-without-changing-the-note). |
 | Show numbers in the Outline | On | While numbers are shown without changing notes, the Outline sidebar shows them too. It has no effect otherwise. |
+| Keep numbers up to date as you write | Off | Renumbers a note that already has written numbers when typing pauses. See [Keep numbers up to date as you write](#keep-numbers-up-to-date-as-you-write). |
 | First numbered level | Automatic | The level that gets a single number. Automatic uses the shallowest heading in each note. Shallower headings stay unnumbered and restart the count, so with level 2 each `#` chapter numbers its sections from 1. |
 | Last numbered level | Heading 6 | Deeper headings are left as they are. |
 | Top-level numbers | 1, 2, 3 | Or A, B, C; a, b, c; I, II, III; i, ii, iii; or Chinese numerals 一, 二, 三 (十, 十一, 二十一, 一百 ...). |
@@ -293,14 +326,16 @@ after the first written 1, 2, 3. The style may end in a separator (`1.1.`,
 Headings writes it. `_.1.1` starts numbering one level lower.
 `number headings: off` leaves the note alone. `contents ^toc` (any block id)
 says where the table of contents goes, as Number Headings reads it, so an
-existing one is kept up to date. `skip ^id` is honoured. `auto` is accepted and ignored.
+existing one is kept up to date. `skip ^id` is honoured. `auto` keeps the note
+numbered as you write, as in Number Headings (see [Keep numbers up to date as
+you write](#keep-numbers-up-to-date-as-you-write)).
 The styles also take `a`, `i` and `一` (lowercase letters, lowercase Roman and
 Chinese numerals), and `template-level-1` / `template-level-other` set the
 text around the number; those are additions that Number Headings ignores.
 
-Writing numbers into the text as you type is not included: rewriting links in
-other notes on every keystroke is not something a plugin should do behind your
-back. Shown numbers give you numbers that follow every edit without that.
+Numbers written as you type are opt-in: links in other notes follow in one
+batch when you leave the note, never on every keystroke. Shown numbers give
+you numbers that follow every edit without writing anything.
 
 ## Pro
 
@@ -364,7 +399,9 @@ this.registerEvent((this.app.workspace as Events).on('section-numbering:api-read
   synchronously, often (on every keystroke while numbers are shown): keep it
   cheap and do not write from it. The first handler that claims a note wins.
 - `on('renumbered', listener)` runs after a numbering or removal command
-  changed a note and Section Numbering rewrote links to it in other notes. The
+  changed a note and Section Numbering rewrote links to it in other notes, and
+  after each batch of links that follows automatic renumbering (`kind`
+  `numbered`, with the renames since the last batch). The
   payload has the note's `path`, its new `text` (the editor's, which may not
   be on disk yet), `kind`, `renames`, `changed` and `linksUpdated`. Do not
   rewrite those links again. `on('settings-changed', listener)` runs after the

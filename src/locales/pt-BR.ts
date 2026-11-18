@@ -51,6 +51,9 @@ const ptBR: Messages = {
   'setting.showInOutline.name': 'Mostrar números no Sumário',
   'setting.showInOutline.desc':
     'Quando os números são mostrados sem alterar as notas, também os mostra na frente dos títulos na barra lateral do Sumário. Não tem efeito em notas cujos números estão escritos no texto, que o Sumário já mostra.',
+  'setting.autoNumber.name': 'Manter os números atualizados enquanto você escreve',
+  'setting.autoNumber.desc':
+    'Quando você pausa a digitação, uma nota que já tem números escritos é renumerada, com o sumário, em um único passo que um só desfazer reverte. Os links em outras notas acompanham quando você sai da nota. Uma nota cuja propriedade number headings inclui auto é mantida atualizada mesmo com isto desativado.',
   'setting.firstLevel.name': 'Primeiro nível numerado',
   'setting.firstLevel.desc':
     'O nível de título que recebe um único número. Automático usa o título de nível mais alto de cada nota. Títulos de nível mais alto ficam sem número e reiniciam a contagem.',

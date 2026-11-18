@@ -51,6 +51,9 @@ const de: Messages = {
   'setting.showInOutline.name': 'Nummern in der Gliederung anzeigen',
   'setting.showInOutline.desc':
     'Wenn Nummern angezeigt werden, ohne Notizen zu ändern, zeigt dies sie auch vor den Überschriften in der Seitenleiste „Gliederung“. Ohne Wirkung bei Notizen, deren Nummern im Text stehen; die zeigt die Gliederung ohnehin an.',
+  'setting.autoNumber.name': 'Nummern beim Schreiben aktuell halten',
+  'setting.autoNumber.desc':
+    'Wenn du beim Tippen innehältst, wird eine Notiz, die bereits geschriebene Nummern hat, samt Inhaltsverzeichnis neu nummeriert, in einem Schritt, den ein einziges Rückgängig zurücknimmt. Links in anderen Notizen folgen, wenn du die Notiz verlässt. Eine Notiz, deren Eigenschaft number headings auto enthält, wird auch dann aktuell gehalten, wenn dies aus ist.',
   'setting.firstLevel.name': 'Erste nummerierte Ebene',
   'setting.firstLevel.desc':
     'Die Überschriftenebene, die eine einzelne Nummer erhält. „Automatisch“ nimmt die höchste Überschriftenebene jeder Notiz. Höhere Überschriften bleiben unnummeriert und beginnen die Zählung neu.',

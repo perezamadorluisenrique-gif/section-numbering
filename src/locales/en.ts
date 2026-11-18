@@ -54,6 +54,9 @@ const en = {
   'setting.showInOutline.name': 'Show numbers in the Outline',
   'setting.showInOutline.desc':
     'When numbers are shown without changing notes, also show them in front of the headings in the Outline sidebar. Has no effect on notes whose numbers are written into the text, which the Outline already shows.',
+  'setting.autoNumber.name': 'Keep numbers up to date as you write',
+  'setting.autoNumber.desc':
+    'When typing pauses, a note that already has written numbers is renumbered, with its table of contents, in one step that a single undo takes back. Links in other notes follow when you leave the note. A note whose number headings property includes auto is kept up to date even when this is off.',
   'setting.firstLevel.name': 'First numbered level',
   'setting.firstLevel.desc':
     'The heading level that gets a single number. Automatic uses the shallowest heading in each note. Shallower headings stay unnumbered and restart the count.',

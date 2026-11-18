@@ -4,6 +4,10 @@ The release workflow uses the section named after the version being released
 as the release description, so every version needs one. `npm version <x.y.z>`
 renames the `Unreleased` heading below to that version.
 
+## 0.11.0
+
+- **Keep numbers up to date as you write.** An opt-in setting renumbers a note that already has written numbers when typing pauses, with its table of contents and the links within the note, in one edit that one undo takes back; the caret stays where you are. Links in other notes follow in one batch when you leave the note or after a longer pause. `number headings: auto` (as Number Headings writes it) now turns this on for a note, even with the setting off. Notes that are `off`, numbered by another plugin, or shown without changing the note are never touched.
+
 ## 0.10.1
 
 - Settings: a link to more plugins, the optional Pro versions and template vaults (opens a web page when clicked).
