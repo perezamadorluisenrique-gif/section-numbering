@@ -56,6 +56,9 @@ const es: Messages = {
   'setting.showInOutline.name': 'Mostrar la numeración en el Esquema',
   'setting.showInOutline.desc':
     'Cuando se muestran los números sin modificar las notas, los muestra también delante de los encabezados en la barra lateral del Esquema. No tiene efecto en las notas cuyos números están escritos en el texto, que el Esquema ya muestra.',
+  'setting.autoNumber.name': 'Mantener los números al día mientras escribes',
+  'setting.autoNumber.desc':
+    'Cuando dejas de escribir un momento, una nota que ya tiene números escritos se renumera, con su índice, en un solo paso que un deshacer revierte. Los enlaces de otras notas se actualizan al salir de la nota. Una nota cuya propiedad number headings incluye auto se mantiene al día aunque esto esté desactivado.',
   'setting.firstLevel.name': 'Primer nivel numerado',
   'setting.firstLevel.desc':
     'El nivel de encabezado que recibe un solo número. Automático usa el encabezado de nivel más alto de cada nota. Los encabezados de nivel superior quedan sin numerar y reinician la cuenta.',

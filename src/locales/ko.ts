@@ -56,6 +56,9 @@ const ko: Messages = {
   'setting.showInOutline.name': '개요에 번호 표시',
   'setting.showInOutline.desc':
     '노트를 변경하지 않고 번호를 표시할 때, 개요 사이드바의 제목 앞에도 번호를 표시합니다. 번호가 본문에 쓰여 있는 노트에는 영향이 없으며, 개요는 이미 그 번호를 보여 줍니다.',
+  'setting.autoNumber.name': '입력하는 동안 번호를 최신으로 유지',
+  'setting.autoNumber.desc':
+    '입력을 잠시 멈추면, 이미 번호가 쓰여 있는 노트를 목차와 함께 다시 번호 매깁니다. 이는 한 번의 실행 취소로 되돌릴 수 있는 한 단계입니다. 다른 노트의 링크는 그 노트를 떠날 때 따라 바뀝니다. number headings 속성에 auto가 들어 있는 노트는 이 설정이 꺼져 있어도 최신으로 유지됩니다.',
   'setting.firstLevel.name': '번호를 매기는 첫 수준',
   'setting.firstLevel.desc':
     '번호가 하나만 붙는 제목 수준입니다. "자동"은 각 노트에서 가장 얕은 제목을 사용합니다. 그보다 얕은 제목은 번호를 매기지 않으며 번호 세기를 다시 시작합니다.',

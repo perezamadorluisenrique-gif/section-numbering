@@ -56,6 +56,9 @@ const fr: Messages = {
   'setting.showInOutline.name': 'Afficher les numéros dans le Plan',
   'setting.showInOutline.desc':
     'Lorsque les numéros sont affichés sans modifier les notes, les affiche aussi devant les titres dans la barre latérale Plan. Sans effet sur les notes dont les numéros sont écrits dans le texte, que le Plan affiche déjà.',
+  'setting.autoNumber.name': 'Garder les numéros à jour pendant la saisie',
+  'setting.autoNumber.desc':
+    'Quand la saisie marque une pause, une note qui a déjà des numéros écrits est renumérotée, avec sa table des matières, en une seule étape qu’une seule annulation défait. Les liens des autres notes suivent quand vous quittez la note. Une note dont la propriété number headings contient auto est tenue à jour même si ce réglage est désactivé.',
   'setting.firstLevel.name': 'Premier niveau numéroté',
   'setting.firstLevel.desc':
     'Le niveau de titre qui reçoit un seul numéro. « Automatique » prend le titre de niveau le plus haut de chaque note. Les titres de niveau supérieur restent non numérotés et relancent le décompte.',

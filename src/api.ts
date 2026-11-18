@@ -43,7 +43,7 @@ export interface RenumberedEvent {
 }
 
 export interface SectionNumberingEvents {
-  /** After a numbering or removal command changed a note and its links were updated. */
+  /** After a numbering or removal command changed a note and its links were updated, or after a batch of automatic renumbering's links. */
   renumbered: RenumberedEvent;
   /** After the plugin's settings (or its folder rules) changed. */
   'settings-changed': undefined;
