@@ -49,6 +49,9 @@ const zh: Messages = {
     '在编辑器和阅读视图中，于标题前绘制编号，而不把它们写入笔记。链接照常有效，无需改写。标题已写有编号的笔记，或属性中写有 "number headings: off" 的笔记，保持原样。',
   'setting.showInOutline.name': '在大纲中显示编号',
   'setting.showInOutline.desc': '在不修改笔记而显示编号时，同时在大纲侧边栏的标题前显示编号。对编号已写入正文的笔记无影响，大纲本来就会显示这些编号。',
+  'setting.autoNumber.name': '输入时保持编号最新',
+  'setting.autoNumber.desc':
+    '停止输入片刻后，已写有编号的笔记会连同目录一起重新编号，这是一步操作，一次撤销即可还原。其他笔记中的链接会在你离开该笔记时更新。number headings 属性中含有 auto 的笔记，即使关闭此项也会保持最新。',
   'setting.firstLevel.name': '起始编号层级',
   'setting.firstLevel.desc': '获得单个编号的标题层级。“自动”使用每篇笔记中最浅的标题层级。更浅的标题不编号，并重新开始计数。',
   'setting.maxLevel.name': '最末编号层级',

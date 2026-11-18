@@ -25,7 +25,8 @@
  * - `skip ^id`: headings whose line ends with that block id are not numbered
  *   (`skip none` turns skipping off for the note).
  *
- * `auto` is accepted and ignored: this plugin numbers on command.
+ * `auto` is read by `hasAutoPart` (`auto.ts`): the note is kept numbered as
+ * you write.
  * `contents ^id` is read by `contentsAnchor`: the table of contents goes
  * after the line that ends with that block id.
  *
@@ -142,7 +143,7 @@ function templateParts(settings: NumberingSettings): string[] {
 }
 
 /** Splits at the commas that are not inside double quotes. */
-function splitParts(value: string): string[] {
+export function splitParts(value: string): string[] {
   const parts: string[] = [];
   let current = '';
   let quoted = false;
